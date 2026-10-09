@@ -1,0 +1,30 @@
+[
+  {
+    "id": "doc-001",
+    "topic": "required_documents",
+    "text": "Applicants must provide a copy of their Emirates ID and a copy of their passport as part of the equivalency application.",
+    "source_url": "https://u.ae/en/information-and-services/education/school-education-k-12/equalising-high-school-certificates",
+    "label": "OFFICIAL"
+  },
+  {
+    "id": "doc-002",
+    "topic": "required_documents",
+    "text": "Applicants must submit original certificates for grades 10, 11, and 12. MOE returns these original certificates to the applicant after verification is complete.",
+    "source_url": "https://u.ae/en/information-and-services/education/school-education-k-12/equalising-high-school-certificates",
+    "label": "OFFICIAL"
+  },
+  {
+    "id": "doc-003",
+    "topic": "required_documents",
+    "text": "If a certificate is issued in a language other than Arabic or English, it requires a legal/certified translation in addition to the required attestation before it can be accepted.",
+    "source_url": "https://u.ae/en/information-and-services/education/school-education-k-12/equalising-high-school-certificates",
+    "label": "OFFICIAL"
+  },
+  {
+    "id": "doc-004",
+    "topic": "required_documents",
+    "text": "Beyond the Emirates ID, passport, and original grade 10-12 certificates, a more detailed checklist (e.g. personal photographs, per-subject transcripts, copies of each attestation stamp) is commonly listed by private attestation/consultancy agencies assisting applicants. This could not be verified against an official MOE checklist document in this session: the official 'Guide to Academic Certificate Equivalency' PDF linked from MOE's e-services pages returned a 404, and a second official 'Applicant Welcome Kit' PDF is a scanned image with no extractable text. Treat any document requirement beyond doc-001 through doc-003 as unconfirmed until the official checklist PDF is retrieved and read.",
+    "source_url": null,
+    "label": "ASSUMPTION"
+  }
+]

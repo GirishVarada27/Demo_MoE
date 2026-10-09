@@ -1,0 +1,16 @@
+[
+  {
+    "id": "fees-001",
+    "topic": "fees_and_timelines",
+    "text": "No official MOE or u.ae page was found stating a specific fee amount (in AED) for Grade 12 certificate equivalency. Secondary/consultancy sources cite figures ranging as widely as AED 50 to AED 1,250, which conflict sharply with each other and cannot be treated as reliable. Any fee figure the agent might need should be stated as unverified, or the agent should say the fee is not confirmed and name checking the official MOE e-services portal as the next step.",
+    "source_url": null,
+    "label": "ASSUMPTION"
+  },
+  {
+    "id": "fees-002",
+    "topic": "fees_and_timelines",
+    "text": "No official MOE or u.ae page was found stating a specific processing timeline for Grade 12 certificate equivalency. Secondary sources cite figures ranging from 5 working days to 3 months, which conflict sharply with each other and cannot be treated as reliable.",
+    "source_url": null,
+    "label": "ASSUMPTION"
+  }
+]

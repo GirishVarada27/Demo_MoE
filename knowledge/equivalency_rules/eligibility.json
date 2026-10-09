@@ -1,0 +1,16 @@
+[
+  {
+    "id": "elig-001",
+    "topic": "eligibility",
+    "text": "The UAE Ministry of Education (MOE) is the sole authority responsible for equalising (certifying the equivalency of) high school certificates in the UAE. Applicants must be UAE residents to use this service.",
+    "source_url": "https://u.ae/en/information-and-services/education/school-education-k-12/equalising-high-school-certificates",
+    "label": "OFFICIAL"
+  },
+  {
+    "id": "elig-002",
+    "topic": "eligibility",
+    "text": "MOE operates two distinct equivalency request forms: 'Request for Equivalency of General Education Certificate in the UAE (Grade 12)' for certificates issued by UAE schools, and 'Request for Equivalency Certificate - General Education from Abroad (Grade 12)' for certificates issued by schools outside the UAE. An applicant whose Grade 12 certificate was issued abroad must use the latter track.",
+    "source_url": "https://u.ae/en/information-and-services/education/school-education-k-12/equalising-high-school-certificates",
+    "label": "OFFICIAL"
+  }
+]

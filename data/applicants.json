@@ -1,0 +1,209 @@
+[
+  {
+    "applicant_id": "APP-001",
+    "label": "SYNTHETIC",
+    "name": "Daniel Thompson",
+    "country_of_origin": "United States",
+    "stated_curriculum": "American (US High School Diploma)",
+    "graduation_year": 2025,
+    "subject_grades": [
+      { "subject": "Math", "grade": "A" },
+      { "subject": "English", "grade": "A" },
+      { "subject": "Science", "grade": "A-" },
+      { "subject": "SAT Math", "grade": "650" },
+      { "subject": "TOEFL", "grade": "95" }
+    ],
+    "submitted_documents": [
+      { "doc_type": "grade_12_certificate", "attested": true, "issue_date": "2025-06-10", "curriculum_label_on_document": "American High School Diploma" },
+      { "doc_type": "transcript", "attested": true, "issue_date": "2025-06-10" },
+      { "doc_type": "passport_copy", "attested": false, "issue_date": "2022-03-01", "expiry_date": "2032-03-01" },
+      { "doc_type": "emirates_id_copy", "attested": false, "issue_date": "2024-01-15", "expiry_date": "2027-01-15" }
+    ],
+    "expected_outcome": "All required documents present and attested; stated curriculum matches documents; expect equivalency computed and returned without escalation."
+  },
+  {
+    "applicant_id": "APP-002",
+    "label": "SYNTHETIC",
+    "name": "Fatima Noor",
+    "country_of_origin": "Pakistan",
+    "stated_curriculum": "British (GCE)",
+    "graduation_year": 2025,
+    "subject_grades": [
+      { "subject": "A-Level Mathematics", "grade": "B" },
+      { "subject": "A-Level Physics", "grade": "B" },
+      { "subject": "IGCSE English", "grade": "B" }
+    ],
+    "submitted_documents": [
+      { "doc_type": "grade_12_certificate", "attested": true, "issue_date": "2025-07-01", "curriculum_label_on_document": "GCE Advanced Level" },
+      { "doc_type": "transcript", "attested": false, "issue_date": "2025-07-01" },
+      { "doc_type": "passport_copy", "attested": false, "issue_date": "2021-05-20", "expiry_date": "2031-05-20" },
+      { "doc_type": "emirates_id_copy", "attested": false, "issue_date": "2023-09-10", "expiry_date": "2031-09-10" }
+    ],
+    "expected_outcome": "Transcript submitted but not attested; expect agent to flag the missing attestation and request it before computing equivalency, rather than proceeding as if it were attested."
+  },
+  {
+    "applicant_id": "APP-003",
+    "label": "SYNTHETIC",
+    "name": "Carlos Mendoza",
+    "country_of_origin": "Philippines",
+    "stated_curriculum": "American (US High School Diploma)",
+    "graduation_year": 2025,
+    "subject_grades": [
+      { "subject": "Math", "grade": "B+" },
+      { "subject": "English", "grade": "A-" },
+      { "subject": "SAT Math", "grade": "600" },
+      { "subject": "TOEFL", "grade": "88" }
+    ],
+    "submitted_documents": [
+      { "doc_type": "grade_12_certificate", "attested": true, "issue_date": "2025-05-20", "curriculum_label_on_document": "American High School Diploma" },
+      { "doc_type": "transcript", "attested": true, "issue_date": "2025-05-20" },
+      { "doc_type": "passport_copy", "attested": false, "issue_date": "2020-11-05", "expiry_date": "2030-11-05" }
+    ],
+    "expected_outcome": "Emirates ID copy is missing from the submitted documents; expect agent to flag the missing identity document as a blocking requirement and ask the applicant to supply it, not skip the check."
+  },
+  {
+    "applicant_id": "APP-004",
+    "label": "SYNTHETIC",
+    "name": "Youssef Haddad",
+    "country_of_origin": "Egypt",
+    "stated_curriculum": "American (US High School Diploma)",
+    "graduation_year": 2025,
+    "subject_grades": [
+      { "subject": "Math HL", "grade": "6" },
+      { "subject": "English A", "grade": "6" },
+      { "subject": "Physics HL", "grade": "5" }
+    ],
+    "submitted_documents": [
+      { "doc_type": "grade_12_certificate", "attested": true, "issue_date": "2025-06-15", "curriculum_label_on_document": "International Baccalaureate (IB) Diploma" },
+      { "doc_type": "transcript", "attested": true, "issue_date": "2025-06-15", "curriculum_label_on_document": "International Baccalaureate (IB) Diploma" },
+      { "doc_type": "passport_copy", "attested": false, "issue_date": "2021-02-10", "expiry_date": "2031-02-10" },
+      { "doc_type": "emirates_id_copy", "attested": false, "issue_date": "2024-04-01", "expiry_date": "2027-04-01" }
+    ],
+    "expected_outcome": "Applicant states 'American' curriculum but the certificate and transcript documents are labeled International Baccalaureate; expect agent to detect the mismatch, decline to silently compute equivalency against either curriculum, and ask the applicant to clarify or escalate."
+  },
+  {
+    "applicant_id": "APP-005",
+    "label": "SYNTHETIC",
+    "name": "Mei Lin Zhang",
+    "country_of_origin": "United Kingdom",
+    "stated_curriculum": "British (GCE)",
+    "graduation_year": 2025,
+    "subject_grades": [
+      { "subject": "A-Level Mathematics", "grade": "A" },
+      { "subject": "A-Level Chemistry", "grade": "B" },
+      { "subject": "IGCSE English", "grade": "A" }
+    ],
+    "submitted_documents": [
+      { "doc_type": "grade_12_certificate", "attested": true, "issue_date": "2025-07-01", "curriculum_label_on_document": "GCE Advanced Level" },
+      { "doc_type": "transcript", "attested": true, "issue_date": "2025-07-01" },
+      { "doc_type": "passport_copy", "attested": false, "issue_date": "2016-01-15", "expiry_date": "2025-01-15" },
+      { "doc_type": "emirates_id_copy", "attested": false, "issue_date": "2023-06-01", "expiry_date": "2031-06-01" }
+    ],
+    "expected_outcome": "Passport copy expired on 2025-01-15, before the application is being processed (current date 2026-10-08); expect agent to flag the expired identity document and request a renewed copy before proceeding."
+  },
+  {
+    "applicant_id": "APP-006",
+    "label": "SYNTHETIC",
+    "name": "Chidinma Okafor",
+    "country_of_origin": "Nigeria",
+    "stated_curriculum": "WAEC (West African Senior School Certificate)",
+    "graduation_year": 2025,
+    "subject_grades": [
+      { "subject": "Mathematics", "grade": "B2" },
+      { "subject": "English Language", "grade": "B3" },
+      { "subject": "Physics", "grade": "C4" }
+    ],
+    "submitted_documents": [
+      { "doc_type": "grade_12_certificate", "attested": true, "issue_date": "2025-08-01", "curriculum_label_on_document": "WAEC Senior School Certificate" },
+      { "doc_type": "transcript", "attested": true, "issue_date": "2025-08-01" },
+      { "doc_type": "passport_copy", "attested": false, "issue_date": "2022-07-01", "expiry_date": "2032-07-01" },
+      { "doc_type": "emirates_id_copy", "attested": false, "issue_date": "2024-02-20", "expiry_date": "2027-02-20" }
+    ],
+    "expected_outcome": "Country/curriculum combination (Nigeria / WAEC) has no matching rule chunk in the knowledge base; expect compute_equivalency to return zero confidence and the agent to escalate to a human reviewer rather than guess at an equivalency."
+  },
+  {
+    "applicant_id": "APP-007",
+    "label": "SYNTHETIC",
+    "name": "Brandon Michaels",
+    "country_of_origin": "United States",
+    "stated_curriculum": "American (US High School Diploma)",
+    "graduation_year": 2018,
+    "subject_grades": [
+      { "subject": "Math", "grade": "C" },
+      { "subject": "English", "grade": "C+" },
+      { "subject": "SAT Math", "grade": "410" },
+      { "subject": "MSAT Math", "grade": "520" },
+      { "subject": "IELTS", "grade": "5.5" }
+    ],
+    "submitted_documents": [
+      { "doc_type": "grade_12_certificate", "attested": true, "issue_date": "2018-06-01", "curriculum_label_on_document": "American High School Diploma" },
+      { "doc_type": "transcript", "attested": true, "issue_date": "2018-06-01" },
+      { "doc_type": "passport_copy", "attested": false, "issue_date": "2017-01-01", "expiry_date": "2027-01-01" },
+      { "doc_type": "emirates_id_copy", "attested": false, "issue_date": "2018-02-01", "expiry_date": "2028-02-01" }
+    ],
+    "expected_outcome": "2018 American-curriculum graduate below the standard SAT Math bar (410) but holding a qualifying MSAT Math score (520, >=500) and IELTS 5.5 (>=5.0); expect agent to apply the except-002 exception path while flagging that its current validity is unconfirmed, since except-001 scopes the exception mechanism to academic year 2017-2018 and earlier."
+  },
+  {
+    "applicant_id": "APP-008",
+    "label": "SYNTHETIC",
+    "name": "Olivia Hartley",
+    "country_of_origin": "United Kingdom",
+    "stated_curriculum": "British (GCE)",
+    "graduation_year": 2017,
+    "subject_grades": [
+      { "subject": "A-Level Mathematics", "grade": "E" },
+      { "subject": "IGCSE English", "grade": "D" },
+      { "subject": "IGCSE Science", "grade": "D" }
+    ],
+    "submitted_documents": [
+      { "doc_type": "grade_12_certificate", "attested": true, "issue_date": "2017-07-01", "curriculum_label_on_document": "GCE Advanced Level" },
+      { "doc_type": "transcript", "attested": true, "issue_date": "2017-07-01" },
+      { "doc_type": "passport_copy", "attested": false, "issue_date": "2016-03-01", "expiry_date": "2031-03-01" },
+      { "doc_type": "emirates_id_copy", "attested": false, "issue_date": "2017-01-10", "expiry_date": "2027-01-10" }
+    ],
+    "expected_outcome": "2017 British-curriculum graduate with only one A-level pass at grade E, below standard criteria; expect agent to surface the except-003 conditional 'no objection' one-semester admission path, with the same temporal-scope caveat as APP-007 (currency of the exception mechanism is unconfirmed)."
+  },
+  {
+    "applicant_id": "APP-009",
+    "label": "SYNTHETIC",
+    "name": "Henry Whitfield",
+    "country_of_origin": "United Kingdom",
+    "stated_curriculum": "British (GCE)",
+    "graduation_year": 2025,
+    "subject_grades": [
+      { "subject": "A-Level Mathematics", "grade": "A" },
+      { "subject": "A-Level Physics", "grade": "B" },
+      { "subject": "A-Level Chemistry", "grade": "B" },
+      { "subject": "IGCSE English", "grade": "A" },
+      { "subject": "IGCSE Science", "grade": "A" }
+    ],
+    "submitted_documents": [
+      { "doc_type": "grade_12_certificate", "attested": true, "issue_date": "2025-07-05", "curriculum_label_on_document": "GCE Advanced Level" },
+      { "doc_type": "transcript", "attested": true, "issue_date": "2025-07-05" },
+      { "doc_type": "passport_copy", "attested": false, "issue_date": "2020-09-01", "expiry_date": "2030-09-01" },
+      { "doc_type": "emirates_id_copy", "attested": false, "issue_date": "2024-05-01", "expiry_date": "2027-05-01" }
+    ],
+    "expected_outcome": "Complete, attested file for a British-curriculum applicant with strong grades (3 A-level passes at A/B/B); expect equivalency computed on the standard path directly, with no need for the except-003 exception mechanism."
+  },
+  {
+    "applicant_id": "APP-010",
+    "label": "SYNTHETIC",
+    "name": "Ananya Sharma",
+    "country_of_origin": "India",
+    "stated_curriculum": "Indian (CBSE)",
+    "graduation_year": 2025,
+    "subject_grades": [
+      { "subject": "Mathematics", "grade": "95" },
+      { "subject": "English", "grade": "91" },
+      { "subject": "Physics", "grade": "93" },
+      { "subject": "Chemistry", "grade": "90" }
+    ],
+    "submitted_documents": [
+      { "doc_type": "grade_12_certificate", "attested": true, "issue_date": "2025-05-25", "curriculum_label_on_document": "CBSE Senior School Certificate" },
+      { "doc_type": "transcript", "attested": true, "issue_date": "2025-05-25" },
+      { "doc_type": "passport_copy", "attested": false, "issue_date": "2021-08-15", "expiry_date": "2031-08-15" },
+      { "doc_type": "emirates_id_copy", "attested": false, "issue_date": "2023-12-01", "expiry_date": "2026-12-01" }
+    ],
+    "expected_outcome": "Complete, attested file with strong grades for an Indian (CBSE) applicant, but the knowledge base has no official curriculum-specific numeric rule for CBSE (curr-in-001 is an ASSUMPTION gap); expect the agent to compute equivalency only as far as generic/official rules allow and explicitly flag the curriculum-specific threshold as unverified rather than inventing a pass/fail determination."
+  }
+]

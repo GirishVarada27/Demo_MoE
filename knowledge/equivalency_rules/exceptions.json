@@ -1,0 +1,30 @@
+[
+  {
+    "id": "except-001",
+    "topic": "exceptions",
+    "text": "MOE has documented exceptional procedures for graduates who do not meet the equivalence criteria stipulated in Ministerial Decision No. 4443 of 2001. This exception mechanism was published in an MOE news article that explicitly scopes its applicability to 'graduates of the current academic year 2017-2018 and previous years' -- it is an officially documented historical exception mechanism, not confirmed as a currently standing, open-ended policy. The agent should not present this exception path as automatically available to a present-day applicant without flagging this temporal scope.",
+    "source_url": "https://www.moe.gov.ae/En/MediaCenter/News/Pages/privateshcoolsequ.aspx",
+    "label": "OFFICIAL"
+  },
+  {
+    "id": "except-002",
+    "topic": "exceptions",
+    "text": "For American-curriculum graduates who fall short of the standard criteria (within the scope described in except-001), MOE's exception procedure accepts an MSAT Math score of at least 500 in place of SAT Math, and an IELTS score of at least 5.0 or an English MSAT score of at least 1100 in place of TOEFL.",
+    "source_url": "https://www.moe.gov.ae/En/MediaCenter/News/Pages/privateshcoolsequ.aspx",
+    "label": "OFFICIAL"
+  },
+  {
+    "id": "except-003",
+    "topic": "exceptions",
+    "text": "For British/IB-curriculum graduates who fall short of the standard criteria (within the scope described in except-001), MOE's exception procedure allows conditional 'no objection' university admission for one semester, contingent on the student passing a qualifying course in math or English that does not count toward their GPA.",
+    "source_url": "https://www.moe.gov.ae/En/MediaCenter/News/Pages/privateshcoolsequ.aspx",
+    "label": "OFFICIAL"
+  },
+  {
+    "id": "except-004",
+    "topic": "exceptions",
+    "text": "No formal appeals-committee process for equivalency decisions is described in the official MOE exceptions article or on the u.ae equivalency service page found in this session. Whether a standing appeals mechanism exists for current applicants is unconfirmed.",
+    "source_url": null,
+    "label": "ASSUMPTION"
+  }
+]

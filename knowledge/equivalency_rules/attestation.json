@@ -1,0 +1,16 @@
+[
+  {
+    "id": "attest-001",
+    "topic": "attestation",
+    "text": "Certificates issued abroad must be attested by the UAE Ministry of Education and/or the education authority of the country of issuance before or as part of equivalency processing.",
+    "source_url": "https://u.ae/en/information-and-services/education/school-education-k-12/equalising-high-school-certificates",
+    "label": "OFFICIAL"
+  },
+  {
+    "id": "attest-002",
+    "topic": "attestation",
+    "text": "A commonly described attestation chain for UAE document legalisation generally is: (1) the issuing country's Ministry of Foreign Affairs, (2) the UAE Embassy in that country, then (3) the UAE Ministry of Foreign Affairs and International Cooperation (MOFAIC). This sequence appears consistently across attestation-agency sources but was not found stated specifically for Grade 12 certificate equivalency on an official moe.gov.ae or u.ae page in this session. Treat as a plausible general convention, not a confirmed service-specific requirement, until verified against an official source.",
+    "source_url": null,
+    "label": "ASSUMPTION"
+  }
+]

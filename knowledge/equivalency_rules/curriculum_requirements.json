@@ -1,0 +1,30 @@
+[
+  {
+    "id": "curr-us-001",
+    "topic": "curriculum_requirements",
+    "text": "An official MOE news article on exception procedures for American-curriculum graduates describes 'MSAT Math' and 'IELTS/English MSAT' as accepted alternatives to SAT Math and TOEFL respectively. This confirms that a SAT Math score and a TOEFL score are part of the baseline equivalency requirement for American-curriculum Grade 12 certificates, though the article itself does not state the exact baseline passing thresholds.",
+    "source_url": "https://www.moe.gov.ae/En/MediaCenter/News/Pages/privateshcoolsequ.aspx",
+    "label": "OFFICIAL"
+  },
+  {
+    "id": "curr-us-002",
+    "topic": "curriculum_requirements",
+    "text": "Exact baseline SAT Math and TOEFL minimum passing scores for American-curriculum Grade 12 equivalency are cited on secondary/consultancy sites but were not confirmed on an official MOE or u.ae page in this session.",
+    "source_url": null,
+    "label": "ASSUMPTION"
+  },
+  {
+    "id": "curr-uk-001",
+    "topic": "curriculum_requirements",
+    "text": "Numeric thresholds commonly cited for British-curriculum equivalency (e.g. a minimum number of A-level or AS-level passes, plus a minimum number of GCSE/IGCSE passes at a given grade) appear only on secondary aggregator/consultancy sites. No official MOE or u.ae page stating these specific thresholds was found in this session.",
+    "source_url": null,
+    "label": "ASSUMPTION"
+  },
+  {
+    "id": "curr-in-001",
+    "topic": "curriculum_requirements",
+    "text": "No official MOE or u.ae page specifying distinct numeric equivalency requirements for Indian-curriculum certificates (CBSE/ICSE) was found in this session. Only generic secondary-source guidance (original certificates, subject-wise transcripts, standard attestation chain) exists, and that guidance is not curriculum-specific.",
+    "source_url": null,
+    "label": "ASSUMPTION"
+  }
+]
