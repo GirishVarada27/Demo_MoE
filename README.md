@@ -36,19 +36,24 @@ with site-packages disabled), then run `get-pip.py` (from
 
 ## Environment variables
 
-Set in `.env` (see `.env.example`):
+Set in `.env` (see `.env.example`). The **chat client is configurable**:
+if `AZURE_OPENAI_ENDPOINT` is set, the agent uses `AzureOpenAI`; otherwise
+it falls back to plain `OpenAI` using `OPENAI_API_KEY`/`OPENAI_MODEL`. Pick
+one mode — don't mix and match.
 
 | Variable | Purpose |
 |---|---|
-| `AZURE_OPENAI_ENDPOINT` | Your Azure OpenAI resource endpoint |
-| `AZURE_OPENAI_API_KEY` | API key for that resource (loaded as a `pydantic.SecretStr` — never logged or printed in plain text) |
-| `AZURE_OPENAI_DEPLOYMENT` | Chat-completion deployment name (must support function/tool calling) |
-| `EMBEDDING_DEPLOYMENT` | Embedding deployment name, used by `search_requirements` |
+| `AZURE_OPENAI_ENDPOINT` | Your Azure OpenAI resource endpoint. Set this to select Azure mode for the chat client |
+| `AZURE_OPENAI_API_KEY` | API key for that resource (loaded as a `pydantic.SecretStr` — never logged or printed in plain text). Required in Azure mode |
+| `AZURE_OPENAI_DEPLOYMENT` | Chat-completion deployment name (must support function/tool calling). Required in Azure mode |
+| `EMBEDDING_DEPLOYMENT` | Embedding deployment name, used by `search_requirements`. **Always required regardless of chat-client mode** — retrieval only supports Azure OpenAI embeddings today |
+| `OPENAI_API_KEY` | Plain OpenAI API key (also a `SecretStr`). Required only if `AZURE_OPENAI_ENDPOINT` is left unset |
+| `OPENAI_MODEL` | Plain OpenAI chat model name (e.g. `gpt-4o`, must support tool calling). Required only if `AZURE_OPENAI_ENDPOINT` is left unset |
 
 `config.get_settings()` raises a `RuntimeError` naming exactly which
-variables are missing — it never fails with an opaque `KeyError`, and never
-needs real credentials to import or run the test suite (every test injects
-a fake model client).
+variables are missing for whichever mode you're in — it never fails with an
+opaque `KeyError`, and never needs real credentials to import or run the
+test suite (every test injects a fake model client).
 
 ## How to run
 

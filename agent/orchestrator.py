@@ -27,15 +27,23 @@ MAX_ITERATIONS = 6
 _CHAT_API_VERSION = "2024-02-01"
 
 
-def _build_client():
-    from openai import AzureOpenAI
+def _build_client(settings: config.Settings | None = None):
+    """Build the chat client: AzureOpenAI if AZURE_OPENAI_ENDPOINT is set, else
+    plain OpenAI using OPENAI_API_KEY (CLAUDE.md: keep model-client choice
+    configurable without touching any other orchestration code)."""
+    settings = settings or config.get_settings()
+    if settings.azure_openai_endpoint:
+        from openai import AzureOpenAI
 
-    settings = config.get_settings()
-    return AzureOpenAI(
-        azure_endpoint=settings.azure_openai_endpoint,
-        api_key=settings.azure_openai_api_key.get_secret_value(),
-        api_version=_CHAT_API_VERSION,
-    )
+        return AzureOpenAI(
+            azure_endpoint=settings.azure_openai_endpoint,
+            api_key=settings.azure_openai_api_key.get_secret_value(),
+            api_version=_CHAT_API_VERSION,
+        )
+
+    from openai import OpenAI
+
+    return OpenAI(api_key=settings.openai_api_key.get_secret_value())
 
 
 def _invoke_tool(name: str, raw_args: dict) -> Any:
@@ -188,8 +196,8 @@ def run_turn(
     """
     if client is None or model is None:
         settings = config.get_settings()
-        client = client or _build_client()
-        model = model or settings.azure_openai_deployment
+        client = client or _build_client(settings)
+        model = model or (settings.azure_openai_deployment if settings.azure_openai_endpoint else settings.openai_model)
     create = create_fn or client.chat.completions.create
 
     messages = [

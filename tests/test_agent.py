@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import tools
-from agent.orchestrator import MAX_ITERATIONS, run_turn
+from agent.orchestrator import MAX_ITERATIONS, _build_client, run_turn
 from agent.validation import LLM_VERIFIER_SYSTEM_PROMPT
+from config import Settings
 from schemas import CaseState
 from tests._fakes import FakeMessage as _FakeMessage
 from tests._fakes import FakeResponse as _FakeResponse
@@ -311,3 +312,32 @@ def test_run_turn_tool_failure_recovers_on_retry(monkeypatch):
     assert tool_names == ["get_applicant_record", "get_applicant_record"]
     assert "(retry)" in case_state.tool_history[1].result_summary
     assert case_state.applicant_id == "APP-001"  # the retry succeeded and case_state was updated
+
+
+# --- configurable model client -----------------------------------------------
+
+
+def test_build_client_uses_azure_openai_when_endpoint_set():
+    from openai import AzureOpenAI
+
+    settings = Settings(
+        azure_openai_endpoint="https://example.openai.azure.com",
+        azure_openai_api_key="azure-key",
+        azure_openai_deployment="gpt-4o",
+        embedding_deployment="text-embedding-3-small",
+    )
+
+    client = _build_client(settings)
+
+    assert isinstance(client, AzureOpenAI)
+
+
+def test_build_client_uses_plain_openai_when_endpoint_unset():
+    from openai import AzureOpenAI, OpenAI
+
+    settings = Settings(openai_api_key="sk-plain-key", openai_model="gpt-4o")
+
+    client = _build_client(settings)
+
+    assert isinstance(client, OpenAI)
+    assert not isinstance(client, AzureOpenAI)
