@@ -15,6 +15,7 @@ from tools.draft_application import CREATE_DRAFT_APPLICATION_TOOL_SCHEMA, create
 from tools.equivalency_calc import EVALUATE_ELIGIBILITY_TOOL_SCHEMA, evaluate_eligibility
 from tools.escalation import ESCALATE_TO_HUMAN_TOOL_SCHEMA, escalate_to_human
 from tools.search_rules import SEARCH_REQUIREMENTS_TOOL_SCHEMA, search_requirements
+from tools.user_facts import RECORD_USER_FACT_TOOL_SCHEMA, record_user_fact
 
 TOOL_SCHEMAS = [
     SEARCH_REQUIREMENTS_TOOL_SCHEMA,
@@ -23,6 +24,7 @@ TOOL_SCHEMAS = [
     EVALUATE_ELIGIBILITY_TOOL_SCHEMA,
     CREATE_DRAFT_APPLICATION_TOOL_SCHEMA,
     ESCALATE_TO_HUMAN_TOOL_SCHEMA,
+    RECORD_USER_FACT_TOOL_SCHEMA,
 ]
 
 TOOL_FUNCTIONS = {
@@ -32,4 +34,5 @@ TOOL_FUNCTIONS = {
     "evaluate_eligibility": evaluate_eligibility,
     "create_draft_application": create_draft_application,
     "escalate_to_human": escalate_to_human,
+    "record_user_fact": record_user_fact,
 }

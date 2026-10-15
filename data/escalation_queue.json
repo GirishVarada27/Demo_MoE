@@ -38,5 +38,29 @@
     "label": "SIMULATED",
     "status": "queued",
     "created_at": "2026-10-15T01:58:43.337844Z"
+  },
+  {
+    "ticket_id": "TCK-48A07927",
+    "reason": "Draft answer failed validation twice: The 'Verified' section claims '- None yet; I do not have information about the applicant's curriculum or documents.', but no OFFICIAL knowledge chunk or successful document check was retrieved this session to ground it.",
+    "case_summary": "{\"applicant_id\":null,\"curriculum\":null,\"facts\":{},\"documents\":null,\"open_questions\":[],\"assumptions\":[],\"tool_history\":[]}",
+    "label": "SIMULATED",
+    "status": "queued",
+    "created_at": "2026-10-15T02:29:12.574365Z"
+  },
+  {
+    "ticket_id": "TCK-AAF67730",
+    "reason": "Eligibility evaluation undeterminable due to missing official score thresholds for SAT Math and TOEFL in the American curriculum rules. Applicant's scores present but cannot be confirmed as passing. Requires manual review.",
+    "case_summary": "Applicant APP-001 Daniel Thompson from the US, American curriculum, submitted all required documents validly, but eligibility rules for test score thresholds are undeterminable in the system.",
+    "label": "SIMULATED",
+    "status": "queued",
+    "created_at": "2026-10-15T02:29:37.465212Z"
+  },
+  {
+    "ticket_id": "TCK-EEE237DB",
+    "reason": "Draft answer failed validation twice: FAIL: The draft states \"Your supplied subject grades include SAT Math 650 and TOEFL 95,\" but the tool outputs do not provide any information about the applicant's actual SAT Math or TOEFL scores.",
+    "case_summary": "{\"applicant_id\":\"APP-001\",\"curriculum\":\"American (US High School Diploma)\",\"facts\":{\"name\":\"Daniel Thompson\",\"country_of_origin\":\"United States\",\"stated_curriculum_on_file\":\"American (US High School Diploma)\",\"last_eligibility_check\":\"curr-us-001=UNDETERMINABLE, curr-us-002=UNDETERMINABLE, except-002=UNDETERMINABLE, except-001=UNDETERMINABLE\",\"escalation_ticket_id\":\"TCK-AAF67730\"},\"documents\":{\"present\":[\"grade_12_certificate\",\"transcript\",\"passport_copy\",\"emirates_id_copy\"],\"missing\":[],\"invalid\":[],\"error\":null},\"open_questions\":[\"Eligibility undeterminable for rule(s): curr-us-001, curr-us-002, except-002, except-001.\"],\"assumptions\":[\"Assumed curriculum 'American (US High School Diploma)' from the applicant's on-file record; confirm with the applicant if this has changed.\"],\"tool_history\":[{\"step\":1,\"tool\":\"get_applicant_record\",\"args\":{\"applicant_id\":\"APP-001\"},\"result_summary\":\"found APP-001 (Daniel Thompson)\",\"timestamp\":\"2026-10-15T02:29:27.989148Z\"},{\"step\":2,\"tool\":\"check_documents\",\"args\":{\"applicant_id\":\"APP-001\",\"curriculum\":\"American (US High School Diploma)\"},\"result_summary\":\"present=['grade_12_certificate', 'transcript', 'passport_copy', 'emirates_id_copy'], missing=[], invalid=[]\",\"timestamp\":\"2026-10-15T02:29:31.204672Z\"},{\"step\":3,\"tool\":\"evaluate_eligibility\",\"args\":{\"case_state\":{\"applicant_id\":\"APP-001\",\"curriculum\":\"American (US High School Diploma)\"}},\"result_summary\":\"verdicts=[curr-us-001[OFFICIAL]=UNDETERMINABLE, curr-us-002[ASSUMPTION]=UNDETERMINABLE, except-002[OFFICIAL]=UNDETERMINABLE, except-001[OFFICIAL]=UNDETERMINABLE], undeterminable=['curr-us-001', 'curr-us-002', 'except-002', 'except-001']\",\"timestamp\":\"2026-10-15T02:29:33.886632Z\"},{\"step\":4,\"tool\":\"escalate_to_human\",\"args\":{\"reason\":\"Eligibility evaluation undeterminable due to missing official score thresholds for SAT Math and TOEFL in the American curriculum rules. Applicant's scores present but cannot be confirmed as passing. Requires manual review.\",\"case_summary\":\"Applicant APP-001 Daniel Thompson from the US, American curriculum, submitted all required documents validly, but eligibility rules for test score thresholds are undeterminable in the system.\"},\"result_summary\":\"ticket TCK-AAF67730 queued (SIMULATED)\",\"timestamp\":\"2026-10-15T02:29:37.489355Z\"}]}",
+    "label": "SIMULATED",
+    "status": "queued",
+    "created_at": "2026-10-15T02:29:45.540643Z"
   }
 ]

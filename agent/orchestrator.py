@@ -19,7 +19,7 @@ from typing import Any, Callable
 import config
 from agent.prompts import SYSTEM_PROMPT
 from agent.validation import validate_draft
-from schemas import CaseState, EligibilityCaseState, ToolCallTrace
+from schemas import CaseState, EligibilityCaseState, ToolCallTrace, UserReportedFact
 from tools import TOOL_FUNCTIONS, TOOL_SCHEMAS
 from tools.escalation import escalate_to_human
 
@@ -81,6 +81,8 @@ def _summarize_result(name: str, result: Any) -> str:
         return f"draft {result.draft.draft_id} created (SIMULATED)"
     if name == "escalate_to_human":
         return f"ticket {result.ticket.ticket_id} queued (SIMULATED)"
+    if name == "record_user_fact":
+        return f"recorded user-reported fact '{result.fact_key}': {result.fact_value}"
     return str(result)[:200]
 
 
@@ -133,6 +135,20 @@ def _apply_result_to_case_state(case_state: CaseState, name: str, args: dict, re
 
     elif name == "escalate_to_human":
         case_state.facts["escalation_ticket_id"] = result.ticket.ticket_id
+
+    elif name == "record_user_fact":
+        fact_key, fact_value = result.fact_key, result.fact_value
+        case_state.user_reported_facts[fact_key] = UserReportedFact(
+            value=fact_value, recorded_at=datetime.now(timezone.utc)
+        )
+        existing = case_state.facts.get(fact_key)
+        if existing is not None and existing != fact_value:
+            note = (
+                f"User reports: '{fact_value}' (as '{fact_key}'), which conflicts with the "
+                f"on-file fact '{existing}'. Treating the user-reported fact as current."
+            )
+            if note not in case_state.open_questions:
+                case_state.open_questions.append(note)
 
 
 def _log_validation_failure(case_state: CaseState, attempt: int, draft: str, failures: list[str]) -> None:
@@ -230,6 +246,7 @@ def run_turn(
     ]
     turn_messages: list[dict] = [{"role": "user", "content": user_message}]
     revision_attempted = False
+    seen_calls: dict[tuple[str, str], str] = {}  # (tool, canonical args) -> result JSON already returned this turn
 
     for _ in range(MAX_ITERATIONS):
         response, call_error = _call_model_with_retry(create, model, messages)
@@ -328,24 +345,33 @@ def run_turn(
             if inject_failures:
                 raw_args["simulate_failure"] = True
 
-            result, succeeded = _execute_tool_with_retry(case_state, name, raw_args)
-
-            if succeeded:
-                result_json = result.model_dump_json()
+            call_key = (name, json.dumps(raw_args, sort_keys=True))
+            if call_key in seen_calls:
+                # Same tool, same args, already called this turn -- reuse the result instead
+                # of invoking (and re-logging) it again.
+                result_json = seen_calls[call_key]
+                _log_tool_call(case_state, name, raw_args, "duplicate call this turn -- reused prior result, not re-invoked")
             else:
-                last_summary = case_state.tool_history[-1].result_summary
-                escalation = escalate_to_human(
-                    reason=f"Tool '{name}' failed twice: {last_summary}",
-                    case_summary=case_state.model_dump_json(),
-                )
-                _log_tool_call(
-                    case_state,
-                    "escalate_to_human",
-                    {"reason": f"tool_failure:{name}"},
-                    _summarize_result("escalate_to_human", escalation),
-                )
-                ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
-                result_json = json.dumps({"error": last_summary, "escalated": True, "ticket_id": ticket_id})
+                result, succeeded = _execute_tool_with_retry(case_state, name, raw_args)
+
+                if succeeded:
+                    result_json = result.model_dump_json()
+                else:
+                    last_summary = case_state.tool_history[-1].result_summary
+                    escalation = escalate_to_human(
+                        reason=f"Tool '{name}' failed twice: {last_summary}",
+                        case_summary=case_state.model_dump_json(),
+                    )
+                    _log_tool_call(
+                        case_state,
+                        "escalate_to_human",
+                        {"reason": f"tool_failure:{name}"},
+                        _summarize_result("escalate_to_human", escalation),
+                    )
+                    ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
+                    result_json = json.dumps({"error": last_summary, "escalated": True, "ticket_id": ticket_id})
+
+                seen_calls[call_key] = result_json
 
             tool_msg = {"role": "tool", "tool_call_id": tc.id, "content": result_json}
             messages.append(tool_msg)

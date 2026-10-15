@@ -17,7 +17,7 @@ from tools.search_rules import load_rule_chunks, search_requirements
 
 
 def test_tool_registry_is_consistent():
-    assert len(tools.TOOL_SCHEMAS) == 6
+    assert len(tools.TOOL_SCHEMAS) == 7
     assert set(tools.TOOL_FUNCTIONS) == {
         "search_requirements",
         "get_applicant_record",
@@ -25,6 +25,7 @@ def test_tool_registry_is_consistent():
         "evaluate_eligibility",
         "create_draft_application",
         "escalate_to_human",
+        "record_user_fact",
     }
     schema_names = {schema["function"]["name"] for schema in tools.TOOL_SCHEMAS}
     assert schema_names == set(tools.TOOL_FUNCTIONS)

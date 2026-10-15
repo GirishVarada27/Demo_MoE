@@ -14,6 +14,9 @@ escalates (CLAUDE.md rules 2 and 3). Two passes:
    - check_eligibility_statements_grounded: if the draft makes an
      eligibility/status statement anywhere, a successful evaluate_eligibility
      call must exist this session.
+   - check_draft_application_caveated: if create_draft_application was
+     called, evaluate_eligibility must have reached a determinable PASS/FAIL
+     this session, or the draft must caveat the application as provisional.
    If any rule-based check fails, the (costly) LLM verifier pass is
    skipped entirely -- there's no point double-checking a draft already
    known to be unsupported.
@@ -115,6 +118,46 @@ def check_eligibility_statements_grounded(draft: str, case_state: CaseState) -> 
     return []
 
 
+_CAVEAT_PATTERN = re.compile(
+    r"\b(caveat|not (?:yet )?confirmed|unconfirmed|undetermined|undeterminable|pending|"
+    r"provisional|preliminary|subject to|not guaranteed|not final)\b",
+    re.IGNORECASE,
+)
+
+
+def check_draft_application_caveated(draft: str, case_state: CaseState) -> list[str]:
+    """If create_draft_application was called, eligibility must have actually
+    reached PASS or FAIL this session -- otherwise the draft is only valid
+    if it plainly caveats the application as provisional. Drafting an
+    application and presenting it as settled when eligibility is still
+    undetermined (or was never evaluated at all) is exactly the kind of
+    overconfident claim CLAUDE.md rule 3 rules out."""
+    draft_created = any(
+        entry.tool == "create_draft_application" and not entry.result_summary.startswith("error:")
+        for entry in case_state.tool_history
+    )
+    if not draft_created:
+        return []
+
+    eligibility_entries = [
+        entry
+        for entry in case_state.tool_history
+        if entry.tool == "evaluate_eligibility" and not entry.result_summary.startswith("error:")
+    ]
+    determinable = bool(eligibility_entries) and (
+        "=PASS" in eligibility_entries[-1].result_summary or "=FAIL" in eligibility_entries[-1].result_summary
+    )
+    if determinable:
+        return []
+
+    if not _CAVEAT_PATTERN.search(draft):
+        return [
+            "create_draft_application was called without evaluate_eligibility reaching a determinable "
+            "PASS/FAIL this session, but the draft doesn't caveat the draft application as provisional."
+        ]
+    return []
+
+
 def llm_verify(draft: str, case_state: CaseState, create: Callable[..., Any], model: str) -> list[str]:
     tool_outputs = "\n".join(f"- {entry.tool}({entry.args}) -> {entry.result_summary}" for entry in case_state.tool_history)
     messages = [
@@ -148,6 +191,7 @@ def validate_draft(
     failures = check_required_sections(draft)
     failures += check_requirement_claims_grounded(draft, case_state)
     failures += check_eligibility_statements_grounded(draft, case_state)
+    failures += check_draft_application_caveated(draft, case_state)
     if failures:
         return ValidationResult(passed=False, failures=failures)
 

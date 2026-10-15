@@ -133,6 +133,22 @@ class ToolCallTrace(BaseModel):
     timestamp: datetime
 
 
+class RecordUserFactResult(BaseModel):
+    fact_key: str | None = None
+    fact_value: str | None = None
+    error: str | None = None
+
+
+class UserReportedFact(BaseModel):
+    """A fact the applicant stated in conversation, as opposed to one derived
+    from a tool result -- kept in its own dict (CaseState.user_reported_facts)
+    and explicitly labeled so it's never confused with tool-derived facts."""
+
+    value: str
+    label: Literal["user_reported"] = "user_reported"
+    recorded_at: datetime
+
+
 class CaseState(BaseModel):
     """The agent's full session-level understanding of the current case.
 
@@ -144,6 +160,7 @@ class CaseState(BaseModel):
     applicant_id: str | None = None
     curriculum: str | None = None
     facts: dict[str, str] = {}
+    user_reported_facts: dict[str, UserReportedFact] = {}
     documents: CheckDocumentsResult | None = None
     open_questions: list[str] = []
     assumptions: list[str] = []

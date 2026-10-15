@@ -23,7 +23,7 @@ base provenance and unverified gaps: `docs/assumptions.md`.
 pip install -r requirements.txt
 cp .env.example .env   # then fill in credentials -- see Environment below
 
-# Run the full test suite (71 tests, no API credentials needed --
+# Run the full test suite (84 tests, no API credentials needed --
 # every test injects a fake model client, never calls a real API)
 pytest
 
@@ -58,20 +58,26 @@ raise a `RuntimeError` naming exactly what's missing, never a silent
 point. Every turn: inject the system prompt (`agent/prompts.py`, a
 five-stage Understand → Plan → Act → Validate → Explain instruction) plus
 a fresh JSON dump of `CaseState` into context, call the chat model with
-all six tool schemas, dispatch whatever tools it chooses (never a
-hardcoded sequence), fold each typed result back into `CaseState`, and
-repeat until the model returns a final answer or `MAX_ITERATIONS` (6) is
-hit. A draft answer is *never* returned directly — it always passes
-through `agent/validation.py::validate_draft()` first.
+all seven tool schemas, dispatch whatever tools it chooses (never a
+hardcoded sequence, and never the same exact tool+args call twice in one
+turn -- a repeat is detected and the cached result reused instead of
+re-invoking), fold each typed result back into `CaseState`, and repeat
+until the model returns a final answer or `MAX_ITERATIONS` (6) is hit. A
+draft answer is *never* returned directly — it always passes through
+`agent/validation.py::validate_draft()` first.
 
-**The six tools** (`tools/`, registered in `tools/__init__.py`'s
+**The seven tools** (`tools/`, registered in `tools/__init__.py`'s
 `TOOL_SCHEMAS`/`TOOL_FUNCTIONS` — add both when adding a new tool):
 `search_requirements` (embeddings search over `knowledge/equivalency_rules/
 *.json`, Azure-only, with a `MIN_RELEVANCE_SCORE` floor so an irrelevant
 query returns nothing rather than a misleading "best available" match),
 `get_applicant_record`, `check_documents`, `evaluate_eligibility`,
-`create_draft_application`, `escalate_to_human`. Every tool returns a
-Pydantic model (never a dict) and accepts `simulate_failure: bool`.
+`create_draft_application`, `escalate_to_human`, `record_user_fact` (the
+only one with no real side effect -- a stateless pass-through; the actual
+`CaseState.user_reported_facts` mutation and conflict-vs-tool-data
+detection happens centrally in `_apply_result_to_case_state`, same as
+every other tool's effect on `CaseState`). Every tool returns a Pydantic
+model (never a dict) and accepts `simulate_failure: bool`.
 
 **Knowledge base labeling:** every chunk in `knowledge/equivalency_rules/`
 carries `label: "OFFICIAL"` (cited to a real source) or `"ASSUMPTION"` (no
