@@ -13,6 +13,7 @@ which point it escalates rather than let the model guess.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -31,12 +32,15 @@ from schemas import (
     UserReportedFact,
 )
 from tools import TOOL_FUNCTIONS, TOOL_SCHEMAS
+from tools._curriculum import classify_curriculum_family
 from tools.document_check import ATTESTATION_REQUIRED_DOC_TYPES
 from tools.escalation import append_to_ticket, escalate_to_human
+from tools.search_rules import search_requirements
 
 MAX_ITERATIONS = 6
 _CHAT_API_VERSION = "2024-02-01"
 _UNAVAILABLE_FACT_VALUES = {"unavailable", "no", "not available", "cannot obtain", "can't obtain", "none"}
+_NO_RULE_SENTINEL_CHUNK_ID = "NONE"
 
 
 def _unavailable_attested_doc_types(case_state: CaseState) -> list[str]:
@@ -105,6 +109,119 @@ def _apply_user_reported_eligibility_override(case_state: CaseState, result: Eva
         undeterminable_rule_ids=[r.chunk_id for r in new_results if r.verdict == "UNDETERMINABLE"],
         error=result.error,
     )
+
+
+def _handle_no_rule_found(case_state: CaseState, result: EvaluateEligibilityResult) -> str | None:
+    """evaluate_eligibility signals "no curriculum-specific rule chunk at all"
+    with a single chunk_id='NONE' entry (tools/equivalency_calc.py), based on
+    a coarse keyword family match. Before the agent is allowed to tell
+    anyone a rule does or doesn't exist for their curriculum/country, this
+    confirms that against search_requirements's embeddings search too
+    (which might catch a chunk the keyword match missed) rather than
+    trusting the keyword match alone -- and if confirmed, escalates
+    immediately because of the missing rule itself, not because a later
+    validation pass happens to fail on an unsupported claim. This is a
+    narrow, conditional safety-net call, not a hardcoded per-turn tool
+    sequence (CLAUDE.md rule 1 is about the latter) -- the same precedent
+    already applies to _escalate_once's other triggers (tool failure,
+    validation failure, max iterations), none of which wait for the model's
+    say-so either.
+
+    Returns a ready-to-send plain-language answer if this triggered an
+    escalation (the caller should return it immediately, bypassing the
+    model's own draft and validation), or None if there's nothing to
+    short-circuit: not the no-rule case, already handled earlier this
+    session, or search_requirements actually found something relevant
+    after all (in which case a note is queued for the model instead).
+    """
+    if len(result.rule_results) != 1 or result.rule_results[0].chunk_id != _NO_RULE_SENTINEL_CHUNK_ID:
+        return None
+    if case_state.facts.get("no_rule_found_reason"):
+        return None
+
+    curriculum = case_state.curriculum or result.curriculum or "the stated curriculum"
+    country = case_state.facts.get("country_of_origin") or "the stated country"
+    family = classify_curriculum_family(curriculum)
+    tag_curriculum = (family or curriculum).upper()
+
+    query = f"equivalency rules for {curriculum} curriculum from {country}"
+    search_result = search_requirements(query=query, curriculum=curriculum)
+    _log_tool_call(
+        case_state,
+        "search_requirements",
+        {"query": query, "curriculum": curriculum, "auto_triggered": "confirming no_rule_found"},
+        _summarize_result("search_requirements", search_result),
+    )
+
+    if search_result.results:
+        note = (
+            f"evaluate_eligibility found no curriculum-specific rule chunk for '{curriculum}', but "
+            f"search_requirements found a possibly relevant chunk ({search_result.results[0].chunk.id}) "
+            "-- check whether it actually applies before concluding no rule exists."
+        )
+        if note not in case_state.open_questions:
+            case_state.open_questions.append(note)
+        return None
+
+    reason_tag = f"no_rule_found:{tag_curriculum}/{country}"
+    case_state.facts["no_rule_found_reason"] = reason_tag
+    escalation, reused = _escalate_once(
+        case_state,
+        reason=f"{reason_tag} -- no equivalency rule chunk or indexed guidance exists for this curriculum/country combination.",
+        case_summary=case_state.model_dump_json(),
+    )
+    _log_tool_call(
+        case_state,
+        "escalate_to_human",
+        {"reason": "no_rule_found"},
+        _summarize_result("escalate_to_human", escalation) + (" (appended to existing ticket)" if reused else ""),
+    )
+    ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
+    return (
+        f"I checked the official rules for {curriculum} from {country}, and there's no published "
+        "equivalency rule for that combination yet, so I'm not able to confirm your certificate "
+        f"equivalency automatically. I've escalated your case to a human reviewer (ticket {ticket_id}) "
+        "who can assess it manually. In the meantime, let me know if there's anything else about "
+        "your certificate or documents you'd like me to note for them."
+    )
+
+
+def _ensure_user_reported_facts_section(case_state: CaseState, draft: str) -> str:
+    """The model is good at deciding whether a user-reported fact belongs in
+    the answer, but not reliably good at remembering to format a "What you
+    told me" section -- and a missing section used to fail validation over
+    something the system can just supply deterministically. If this session
+    has user-reported facts and the model's draft doesn't already include
+    the section, append one built straight from CaseState (never the
+    model's own words) instead of asking the model to get the formatting
+    right. If there are no user-reported facts, nothing is added -- the
+    section is simply absent, not a validation failure."""
+    if not case_state.user_reported_facts:
+        return draft
+    if re.search(r"what\s+you\s+told\s+me", draft, re.IGNORECASE):
+        return draft
+    facts_text = "; ".join(f"{key}: {fact.value}" for key, fact in case_state.user_reported_facts.items())
+    return draft.rstrip() + f"\n\nWhat you told me: {facts_text}."
+
+
+_SECTION_FAILURE_PHRASES: list[tuple[str, str]] = [
+    ("missing required section", "my draft answer was missing some required information"),
+    ("official knowledge chunk", "a claim in my draft wasn't backed by an official rule I'd actually confirmed this session"),
+    ("eligibility", "an eligibility statement in my draft wasn't backed by a completed eligibility check"),
+    ("draft application", "a draft application wasn't clearly marked as provisional"),
+]
+
+
+def _plain_language_failure_reason(failures: list[str]) -> str:
+    """Translate validator failure text into a citizen-facing phrase with no
+    section names or validator wording -- the raw failures still go to the
+    trace in full (_log_validation_failure); this is only for the chat
+    reply, which must never quote them directly."""
+    lowered = " ".join(failures).lower()
+    for needle, phrase in _SECTION_FAILURE_PHRASES:
+        if needle in lowered:
+            return phrase
+    return "part of my draft answer wasn't fully supported by what I'd actually verified this session"
 
 
 def _build_client(settings: config.Settings | None = None):
@@ -405,6 +522,7 @@ def run_turn(
 
         if not message.tool_calls:
             draft = message.content or ""
+            draft = _ensure_user_reported_facts_section(case_state, draft)
             validation = validate_draft(draft, case_state, create=create, model=model)
 
             if validation.passed:
@@ -446,10 +564,10 @@ def run_turn(
             )
             ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
             fallback = (
-                "I wasn't able to verify this answer well enough to send it as-is. Specifically:\n"
-                + "\n".join(f"- {f}" for f in validation.failures)
-                + f"\nI've escalated this case to a human reviewer (SIMULATED ticket {ticket_id}) "
-                "so they can confirm the details I couldn't."
+                "I wasn't able to confirm this answer carefully enough to send it as final -- "
+                f"{_plain_language_failure_reason(validation.failures)}. I've escalated your case to "
+                f"a human reviewer (ticket {ticket_id}) so they can confirm the details directly. "
+                "Let me know if there's anything else you'd like to add in the meantime."
             )
             turn_messages.append({"role": "assistant", "content": fallback})
             conversation.extend(turn_messages)
@@ -490,6 +608,16 @@ def run_turn(
 
                 if succeeded:
                     result_json = result.model_dump_json()
+                    if name == "evaluate_eligibility":
+                        no_rule_answer = _handle_no_rule_found(case_state, result)
+                        if no_rule_answer is not None:
+                            seen_calls[call_key] = result_json
+                            tool_msg = {"role": "tool", "tool_call_id": tc.id, "content": result_json}
+                            messages.append(tool_msg)
+                            turn_messages.append(tool_msg)
+                            turn_messages.append({"role": "assistant", "content": no_rule_answer})
+                            conversation.extend(turn_messages)
+                            return no_rule_answer
                 else:
                     last_summary = case_state.tool_history[-1].result_summary
                     escalation, reused = _escalate_once(

@@ -5,11 +5,14 @@ sent as-is; agent.orchestrator.run_turn either gets it revised once or
 escalates (CLAUDE.md rules 2 and 3). Two passes:
 
 1. Rule-based (cheap, no model call):
-   - check_required_sections: the draft must contain all four required
-     output sections (Verified, Assumed, Simulated, Next step), plus a
-     fifth -- "What you told me" -- whenever this session actually has
-     user-reported facts to summarize (point 6: user-stated facts get
-     their own section, not folded into Verified/Assumed/Simulated).
+   - check_required_sections: the draft must contain the four required
+     output sections (Verified, Assumed, Simulated, Next step). A fifth,
+     optional section -- "What you told me" -- summarizes user-reported
+     facts when this session has any, but its presence is guaranteed by
+     agent.orchestrator._ensure_user_reported_facts_section (appended
+     deterministically from CaseState before validation ever runs, not
+     left to the model), so validation never fails a draft just for
+     omitting it.
    - check_requirement_claims_grounded: if the draft's "Verified" section
      states something non-trivial, an OFFICIAL-labeled knowledge chunk
      (via search_requirements or evaluate_eligibility) must actually have
@@ -91,14 +94,12 @@ def _extract_section(draft: str, header: str) -> str | None:
 
 
 def check_required_sections(draft: str, case_state: CaseState | None = None) -> list[str]:
+    """case_state is accepted for API consistency with the other checks but
+    unused here -- "What you told me" is never a required section (see the
+    module docstring): its presence is guaranteed deterministically by the
+    orchestrator before validation runs, not enforced by failing the draft."""
     lowered = draft.lower()
-    required = list(REQUIRED_SECTIONS)
-    if case_state is not None and case_state.user_reported_facts:
-        # Point 6: user-stated facts get their own section, not folded into
-        # Verified/Assumed/Simulated -- only required when there's actually
-        # something the user told us to summarize this session.
-        required.append("What you told me")
-    return [f"Missing required section: '{section}'." for section in required if section.lower() not in lowered]
+    return [f"Missing required section: '{section}'." for section in REQUIRED_SECTIONS if section.lower() not in lowered]
 
 
 def check_requirement_claims_grounded(draft: str, case_state: CaseState) -> list[str]:

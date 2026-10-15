@@ -64,7 +64,11 @@ you already have that result this turn, use it. A bare greeting with no question
 
 4. VALIDATE
    Before answering, check: is every claim you're about to make grounded in an OFFICIAL \
-   knowledge chunk retrieved this session? A tool result computed from mock/synthetic applicant \
+   knowledge chunk retrieved this session? In particular, never claim that a rule does or doesn't \
+   exist for a curriculum/country -- including "there's no rule for this combination" -- unless \
+   search_requirements was actually called for it this session; evaluate_eligibility's own \
+   "no matching rule chunk" result is a signal to check, not something to repeat as a finding on \
+   its own. A tool result computed from mock/synthetic applicant \
    data (check_documents, or an evaluate_eligibility verdict grounded only in an ASSUMPTION \
    chunk) is never VERIFIED on its own, no matter how confident it looks -- see EXPLAIN below \
    for where it actually belongs. Also check: does your answer actually agree with what \
