@@ -126,11 +126,20 @@ def test_at_most_one_escalation_ticket_per_case_is_reused(tmp_path, monkeypatch)
     run_turn(case_state, [], "hi again", client=object(), model="fake-model", create_fn=create_fn_2)
     second_ticket_id = case_state.facts["escalation_ticket_id"]
 
-    assert first_ticket_id == second_ticket_id  # reused, not a new ticket
+    assert first_ticket_id == second_ticket_id  # same ticket, not a new one
     escalate_entries = [t for t in case_state.tool_history if t.tool == "escalate_to_human"]
     assert len(escalate_entries) == 2
-    assert "(reused existing ticket)" in escalate_entries[1].result_summary
-    assert "(reused existing ticket)" not in escalate_entries[0].result_summary
+    assert "(appended to existing ticket)" in escalate_entries[1].result_summary
+    assert "(appended to existing ticket)" not in escalate_entries[0].result_summary
+
+    # The persisted ticket itself was actually updated, not just referenced in memory.
+    import json
+
+    queue = json.loads((tmp_path / "escalation_queue.json").read_text(encoding="utf-8"))
+    assert len(queue) == 1  # still exactly one ticket in the store
+    assert queue[0]["ticket_id"] == first_ticket_id
+    assert len(queue[0]["updates"]) == 1
+    assert "validation" in queue[0]["updates"][0].lower()
 
 
 # --- 3. "What documents do I need?" still calls only search_requirements ----

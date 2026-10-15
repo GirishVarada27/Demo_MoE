@@ -63,3 +63,27 @@ def escalate_to_human(reason: str, case_summary: str, simulate_failure: bool = F
         return EscalateToHumanResult(error=f"Failed to write escalation ticket to the mock queue: {exc}")
 
     return EscalateToHumanResult(ticket=ticket)
+
+
+def append_to_ticket(ticket_id: str, note: str) -> EscalateToHumanResult:
+    """Append a new reason/context note to an EXISTING ticket instead of
+    filing a new one -- at most one ticket per case (agent.orchestrator's
+    _escalate_once), and a second escalation trigger should still carry its
+    new context forward, not get silently discarded. Never raises -- same
+    reasoning as escalate_to_human itself (this is also part of the
+    safety-net path)."""
+    try:
+        existing = json.loads(_QUEUE_PATH.read_text(encoding="utf-8")) if _QUEUE_PATH.exists() else []
+    except (OSError, json.JSONDecodeError) as exc:
+        return EscalateToHumanResult(error=f"Failed to read the mock escalation queue: {exc}")
+
+    for entry in existing:
+        if entry.get("ticket_id") == ticket_id:
+            entry.setdefault("updates", []).append(note)
+            try:
+                _QUEUE_PATH.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+            except OSError as exc:
+                return EscalateToHumanResult(error=f"Failed to write the mock escalation queue: {exc}")
+            return EscalateToHumanResult(ticket=EscalationTicket(**entry))
+
+    return EscalateToHumanResult(error=f"No existing ticket '{ticket_id}' found to append to.")

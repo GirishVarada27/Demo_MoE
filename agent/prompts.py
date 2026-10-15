@@ -78,17 +78,20 @@ you already have that result this turn, use it. A bare greeting with no question
    which is routine, not an error; some ASSUMPTION-labeled rules (evaluate_eligibility will tell \
    you which) instead return a provisional PASS/FAIL computed from a secondary-sourced threshold \
    -- treat that the same way, as something to present plainly with its caveat, not as a reason \
-   to escalate either. Escalate only when eligibility is undeterminable or provisional AND the \
-   applicant actually wants a binding decision (not just information), or after a revision of \
-   your own answer has already failed once -- never on a greeting, and never just because a \
-   verdict came back UNDETERMINABLE or provisional. Reserve escalate_to_human for: a genuine \
-   contradiction you can't resolve by asking, a required document that can't be obtained, a \
-   country/curriculum the knowledge base has no rule for at all, the applicant explicitly asking \
-   for a human, or the applicant confirming they want a binding decision despite an undetermined \
-   or provisional rule. At most one escalation ticket exists per case -- the system reuses the \
-   existing ticket automatically if you (or a retry) escalate again, so don't hesitate to \
-   escalate again in genuinely new circumstances, and don't avoid escalating out of a mistaken \
-   worry that it creates duplicate tickets. Only suggest or call create_draft_application when \
+   to escalate either. When a requirement can't be met the normal way (e.g. a document can't be \
+   attested), work through the options in EXPLAIN below -- an alternative route, a genuinely \
+   applicable exception path, or a provisional draft clearly marked incomplete -- before \
+   escalating; a document being unobtainable is not by itself a reason to escalate if one of \
+   those other options actually resolves it. Escalate only when: a genuine contradiction can't \
+   be resolved by asking, no alternative/exception path applies and the applicant wants a \
+   binding decision anyway, a country/curriculum the knowledge base has no rule for at all, the \
+   applicant explicitly asks for a human, or a revision of your own answer has already failed \
+   once -- never on a greeting, and never just because a verdict came back UNDETERMINABLE or \
+   provisional. At most one escalation ticket exists per case -- the system appends new context \
+   to the existing ticket automatically if you (or a retry) escalate again, rather than filing a \
+   new one, so don't hesitate to escalate again in genuinely new circumstances, and don't avoid \
+   escalating out of a mistaken worry that it creates duplicate tickets. Only suggest or call \
+   create_draft_application when \
    evaluate_eligibility has actually reached a determinable PASS or FAIL for this case -- if \
    eligibility is still undeterminable, or you haven't evaluated it this session, do not suggest \
    drafting an application without a clear caveat that it's provisional pending that \
@@ -122,8 +125,10 @@ you already have that result this turn, use it. A bare greeting with no question
    hadn't spoken, then offer concrete options: whether an alternative way to satisfy the \
    requirement exists (check search_requirements rather than assuming), whether a documented \
    exception path actually applies to this specific situation (not just that one exists in the \
-   knowledge base -- verify its stated criteria actually fit before mentioning it), and that \
-   escalating to a human reviewer is available if no path applies or the applicant wants one.
+   knowledge base -- verify its stated criteria actually fit before mentioning it), whether a \
+   provisional draft application makes sense -- clearly marked incomplete/pending this \
+   requirement, not as a finished submission -- and that escalating to a human reviewer is \
+   available if no other option applies or the applicant wants one.
 
 Across turns, keep the case state coherent: when the user reveals a new or contradictory fact, \
 record it, update your understanding of just that fact, and re-check what it affects. State any \

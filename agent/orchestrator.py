@@ -19,13 +19,92 @@ from typing import Any, Callable
 import config
 from agent.prompts import SYSTEM_PROMPT
 from agent.validation import validate_draft
-from schemas import CaseState, EligibilityCaseState, EscalateToHumanResult, EscalationTicket, ToolCallTrace, UserReportedFact
+from schemas import (
+    CaseState,
+    CheckDocumentsResult,
+    EligibilityCaseState,
+    EscalateToHumanResult,
+    EvaluateEligibilityResult,
+    InvalidDocument,
+    RuleEvaluation,
+    ToolCallTrace,
+    UserReportedFact,
+)
 from tools import TOOL_FUNCTIONS, TOOL_SCHEMAS
 from tools.document_check import ATTESTATION_REQUIRED_DOC_TYPES
-from tools.escalation import escalate_to_human
+from tools.escalation import append_to_ticket, escalate_to_human
 
 MAX_ITERATIONS = 6
 _CHAT_API_VERSION = "2024-02-01"
+_UNAVAILABLE_FACT_VALUES = {"unavailable", "no", "not available", "cannot obtain", "can't obtain", "none"}
+
+
+def _unavailable_attested_doc_types(case_state: CaseState) -> list[str]:
+    """Doc types the applicant has reported can't be attested, e.g. a
+    user_reported_facts entry {"attested_transcript": "unavailable"} means
+    the "transcript" doc type. Drives both overrides below."""
+    doc_types = []
+    for fact_key, fact in case_state.user_reported_facts.items():
+        if fact_key.startswith("attested_") and fact.value.strip().lower() in _UNAVAILABLE_FACT_VALUES:
+            doc_types.append(fact_key[len("attested_") :])
+    return doc_types
+
+
+def _apply_user_reported_document_override(case_state: CaseState, result: CheckDocumentsResult) -> CheckDocumentsResult:
+    """If the applicant reports a document's attestation is unavailable,
+    reflect that reality instead of a stale mock-data value that
+    contradicts what they just said -- re-running check_documents is
+    otherwise a no-op, since it's a pure function of (applicant_id,
+    curriculum) alone and has no way to hear what the user just told us."""
+    unavailable = set(_unavailable_attested_doc_types(case_state))
+    if not unavailable.intersection(result.present):
+        return result
+    present = [d for d in result.present if d not in unavailable]
+    invalid = list(result.invalid) + [
+        InvalidDocument(doc_type=d, reason="applicant reports attestation is unavailable (user-reported)")
+        for d in result.present
+        if d in unavailable
+    ]
+    return CheckDocumentsResult(present=present, missing=result.missing, invalid=invalid, error=result.error)
+
+
+def _apply_user_reported_eligibility_override(case_state: CaseState, result: EvaluateEligibilityResult) -> EvaluateEligibilityResult:
+    """Same idea for evaluate_eligibility: a PASS computed from scores alone
+    doesn't mean much if a required document can't actually be attested --
+    downgrade it to UNDETERMINABLE rather than let the tool keep reporting
+    a PASS the user's own words already contradict."""
+    unavailable = _unavailable_attested_doc_types(case_state)
+    if not unavailable:
+        return result
+    changed = False
+    new_results = []
+    for r in result.rule_results:
+        if r.verdict != "PASS":
+            new_results.append(r)
+            continue
+        changed = True
+        new_results.append(
+            RuleEvaluation(
+                chunk_id=r.chunk_id,
+                topic=r.topic,
+                label=r.label,
+                verdict="UNDETERMINABLE",
+                reason=(
+                    f"{r.reason} However, the applicant reports being unable to obtain attestation "
+                    f"for: {', '.join(unavailable)}. A determination can't be confirmed without that "
+                    "document, so this is UNDETERMINABLE rather than PASS until it's resolved."
+                ),
+            )
+        )
+    if not changed:
+        return result
+    return EvaluateEligibilityResult(
+        applicant_id=result.applicant_id,
+        curriculum=result.curriculum,
+        rule_results=new_results,
+        undeterminable_rule_ids=[r.chunk_id for r in new_results if r.verdict == "UNDETERMINABLE"],
+        error=result.error,
+    )
 
 
 def _build_client(settings: config.Settings | None = None):
@@ -90,9 +169,14 @@ def _summarize_result(name: str, result: Any) -> str:
     return str(result)[:200]
 
 
-def _apply_result_to_case_state(case_state: CaseState, name: str, args: dict, result: Any) -> None:
+def _apply_result_to_case_state(case_state: CaseState, name: str, args: dict, result: Any) -> Any:
+    """Fold a tool result into CaseState. Returns the result to actually use
+    going forward (the model's tool message and case_state storage both use
+    this return value) -- normally just `result` unchanged, but
+    check_documents/evaluate_eligibility may come back overridden to
+    reflect a user-reported fact the raw tool call can't see on its own."""
     if getattr(result, "error", None):
-        return
+        return result
 
     if name == "get_applicant_record" and result.found:
         applicant = result.applicant
@@ -120,6 +204,7 @@ def _apply_result_to_case_state(case_state: CaseState, name: str, args: dict, re
         new_curriculum = args.get("curriculum")
         if new_curriculum and new_curriculum != case_state.curriculum:
             case_state.curriculum = new_curriculum
+        result = _apply_user_reported_document_override(case_state, result)
         case_state.documents = result
 
     elif name == "evaluate_eligibility":
@@ -127,6 +212,7 @@ def _apply_result_to_case_state(case_state: CaseState, name: str, args: dict, re
         new_curriculum = inner.get("curriculum")
         if new_curriculum and new_curriculum != case_state.curriculum:
             case_state.curriculum = new_curriculum
+        result = _apply_user_reported_eligibility_override(case_state, result)
         verdicts = ", ".join(f"{r.chunk_id}={r.verdict}" for r in result.rule_results)
         case_state.facts["last_eligibility_check"] = verdicts
         if result.undeterminable_rule_ids:
@@ -162,20 +248,21 @@ def _apply_result_to_case_state(case_state: CaseState, name: str, args: dict, re
         if note not in case_state.open_questions:
             case_state.open_questions.append(note)
 
+    return result
+
 
 def _escalate_once(case_state: CaseState, reason: str, case_summary: str) -> tuple[EscalateToHumanResult, bool]:
     """At most one escalation ticket per case -- if one already exists for
-    this case, reuse it instead of filing a new one every time something
-    escalates. Returns (result, reused)."""
+    this case, append the new reason as a note on it instead of filing a
+    new ticket every time something escalates. Returns (result, reused)."""
     existing_ticket_id = case_state.facts.get("escalation_ticket_id")
     if existing_ticket_id:
-        reused_ticket = EscalationTicket(
-            ticket_id=existing_ticket_id,
-            reason=reason,
-            case_summary=case_summary,
-            created_at=datetime.now(timezone.utc),
-        )
-        return EscalateToHumanResult(ticket=reused_ticket), True
+        result = append_to_ticket(existing_ticket_id, note=reason)
+        if result.ticket:
+            return result, True
+        # The existing ticket id is stale/unreadable (e.g. a wiped mock
+        # store) -- fall through and file a fresh one rather than lose the
+        # escalation entirely.
 
     result = escalate_to_human(reason=reason, case_summary=case_summary)
     if result.ticket:
@@ -224,13 +311,18 @@ def _call_tool_once(name: str, raw_args: dict) -> tuple[Any | None, str, bool]:
 
 
 def _execute_tool_with_retry(case_state: CaseState, name: str, raw_args: dict) -> tuple[Any | None, bool]:
-    """Call a tool, retrying once on failure. Logs every attempt as its own trace step."""
+    """Call a tool, retrying once on failure. Logs every attempt as its own
+    trace step -- after applying any user-reported-fact override, so the
+    trace (and the result sent back to the model) shows the corrected
+    picture, not a stale one that contradicts what the user just said."""
     for attempt in (1, 2):
         result, summary, succeeded = _call_tool_once(name, raw_args)
-        _log_tool_call(case_state, name, raw_args, summary if attempt == 1 else f"{summary} (retry)")
         if succeeded:
-            _apply_result_to_case_state(case_state, name, raw_args, result)
+            result = _apply_result_to_case_state(case_state, name, raw_args, result)
+            summary = _summarize_result(name, result)
+            _log_tool_call(case_state, name, raw_args, summary if attempt == 1 else f"{summary} (retry)")
             return result, True
+        _log_tool_call(case_state, name, raw_args, summary if attempt == 1 else f"{summary} (retry)")
     return None, False
 
 
@@ -298,7 +390,7 @@ def run_turn(
                 case_state,
                 "escalate_to_human",
                 {"reason": "model_call_failed"},
-                _summarize_result("escalate_to_human", escalation) + (" (reused existing ticket)" if reused else ""),
+                _summarize_result("escalate_to_human", escalation) + (" (appended to existing ticket)" if reused else ""),
             )
             ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
             fallback = (
@@ -350,12 +442,14 @@ def run_turn(
                 case_state,
                 "escalate_to_human",
                 {"reason": "validation_failed_twice"},
-                _summarize_result("escalate_to_human", escalation) + (" (reused existing ticket)" if reused else ""),
+                _summarize_result("escalate_to_human", escalation) + (" (appended to existing ticket)" if reused else ""),
             )
             ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
             fallback = (
-                "I couldn't produce an answer that passed validation, so I've escalated this case to "
-                f"a human reviewer (SIMULATED ticket {ticket_id})."
+                "I wasn't able to verify this answer well enough to send it as-is. Specifically:\n"
+                + "\n".join(f"- {f}" for f in validation.failures)
+                + f"\nI've escalated this case to a human reviewer (SIMULATED ticket {ticket_id}) "
+                "so they can confirm the details I couldn't."
             )
             turn_messages.append({"role": "assistant", "content": fallback})
             conversation.extend(turn_messages)
@@ -407,7 +501,7 @@ def run_turn(
                         case_state,
                         "escalate_to_human",
                         {"reason": f"tool_failure:{name}"},
-                        _summarize_result("escalate_to_human", escalation) + (" (reused existing ticket)" if reused else ""),
+                        _summarize_result("escalate_to_human", escalation) + (" (appended to existing ticket)" if reused else ""),
                     )
                     ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
                     result_json = json.dumps({"error": last_summary, "escalated": True, "ticket_id": ticket_id})
@@ -427,7 +521,7 @@ def run_turn(
         case_state,
         "escalate_to_human",
         {"reason": "max_iterations_reached"},
-        _summarize_result("escalate_to_human", escalation) + (" (reused existing ticket)" if reused else ""),
+        _summarize_result("escalate_to_human", escalation) + (" (appended to existing ticket)" if reused else ""),
     )
     ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
     fallback = (

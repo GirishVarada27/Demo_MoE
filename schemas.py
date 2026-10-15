@@ -118,6 +118,7 @@ class EscalationTicket(BaseModel):
     label: Literal["SIMULATED"] = "SIMULATED"
     status: Literal["queued"] = "queued"
     created_at: datetime
+    updates: list[str] = []
 
 
 class EscalateToHumanResult(BaseModel):
