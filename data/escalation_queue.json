@@ -1,1 +1,42 @@
-[]
+[
+  {
+    "ticket_id": "TCK-9CC3FD5C",
+    "reason": "Draft answer failed validation twice: FAIL: The draft answer claims the transcript is not attested, but the tool output only indicates the transcript is invalid; attestation status is not explicitly stated.",
+    "case_summary": "{\"applicant_id\":\"APP-002\",\"curriculum\":\"British (GCE)\",\"facts\":{\"name\":\"Fatima Noor\",\"country_of_origin\":\"Pakistan\",\"stated_curriculum_on_file\":\"British (GCE)\"},\"documents\":{\"present\":[\"grade_12_certificate\",\"passport_copy\",\"emirates_id_copy\"],\"missing\":[],\"invalid\":[{\"doc_type\":\"transcript\",\"reason\":\"not attested\"}],\"error\":null},\"open_questions\":[],\"assumptions\":[\"Assumed curriculum 'British (GCE)' from the applicant's on-file record; confirm with the applicant if this has changed.\"],\"tool_history\":[{\"step\":1,\"tool\":\"get_applicant_record\",\"args\":{\"applicant_id\":\"APP-002\"},\"result_summary\":\"found APP-002 (Fatima Noor)\",\"timestamp\":\"2026-10-15T01:30:06.439512Z\"},{\"step\":2,\"tool\":\"check_documents\",\"args\":{\"applicant_id\":\"APP-002\",\"curriculum\":\"British (GCE)\"},\"result_summary\":\"present=['grade_12_certificate', 'passport_copy', 'emirates_id_copy'], missing=[], invalid=['transcript']\",\"timestamp\":\"2026-10-15T01:30:11.033337Z\"}]}",
+    "label": "SIMULATED",
+    "status": "queued",
+    "created_at": "2026-10-15T01:30:20.247785Z"
+  },
+  {
+    "ticket_id": "TCK-0C678415",
+    "reason": "Draft answer failed validation twice: The 'Verified' section claims '- No verified information about the applicant\u2019s curriculum or documents is available yet.', but no OFFICIAL knowledge chunk or successful document check was retrieved this session to ground it.",
+    "case_summary": "{\"applicant_id\":null,\"curriculum\":null,\"facts\":{},\"documents\":null,\"open_questions\":[],\"assumptions\":[],\"tool_history\":[]}",
+    "label": "SIMULATED",
+    "status": "queued",
+    "created_at": "2026-10-15T01:38:21.918210Z"
+  },
+  {
+    "ticket_id": "TCK-785FFEAC",
+    "reason": "Draft answer failed validation twice: FAIL: The draft claims official MOE requirements include submitting original certificates for grades 10 and 11, but the tool outputs only indicate presence of grade 12 certificate and do not confirm the need for grade 10 and 11 certificates.",
+    "case_summary": "{\"applicant_id\":\"APP-009\",\"curriculum\":\"British (GCE)\",\"facts\":{\"name\":\"Henry Whitfield\",\"country_of_origin\":\"United Kingdom\",\"stated_curriculum_on_file\":\"British (GCE)\",\"last_eligibility_check\":\"curr-uk-001=UNDETERMINABLE, except-003=UNDETERMINABLE, except-001=UNDETERMINABLE\"},\"documents\":{\"present\":[\"grade_12_certificate\",\"transcript\",\"passport_copy\",\"emirates_id_copy\"],\"missing\":[],\"invalid\":[],\"error\":null},\"open_questions\":[\"Eligibility undeterminable for rule(s): curr-uk-001, except-003, except-001.\"],\"assumptions\":[\"Assumed curriculum 'British (GCE)' from the applicant's on-file record; confirm with the applicant if this has changed.\"],\"tool_history\":[{\"step\":1,\"tool\":\"get_applicant_record\",\"args\":{\"applicant_id\":\"APP-009\"},\"result_summary\":\"found APP-009 (Henry Whitfield)\",\"timestamp\":\"2026-10-15T01:38:43.852620Z\"},{\"step\":2,\"tool\":\"check_documents\",\"args\":{\"applicant_id\":\"APP-009\",\"curriculum\":\"British (GCE)\"},\"result_summary\":\"present=['grade_12_certificate', 'transcript', 'passport_copy', 'emirates_id_copy'], missing=[], invalid=[]\",\"timestamp\":\"2026-10-15T01:38:51.351338Z\"},{\"step\":3,\"tool\":\"evaluate_eligibility\",\"args\":{\"case_state\":{\"applicant_id\":\"APP-009\",\"curriculum\":\"British (GCE)\"}},\"result_summary\":\"verdicts=[curr-uk-001[ASSUMPTION]=UNDETERMINABLE, except-003[OFFICIAL]=UNDETERMINABLE, except-001[OFFICIAL]=UNDETERMINABLE], undeterminable=['curr-uk-001', 'except-003', 'except-001']\",\"timestamp\":\"2026-10-15T01:38:51.357335Z\"},{\"step\":4,\"tool\":\"search_requirements\",\"args\":{\"query\":\"required documents for equivalency application for British (GCE) curriculum Grade 12 certificate\"},\"result_summary\":\"5 result(s), top=elig-002 [OFFICIAL] (score=0.6281)\",\"timestamp\":\"2026-10-15T01:38:59.353061Z\"}]}",
+    "label": "SIMULATED",
+    "status": "queued",
+    "created_at": "2026-10-15T01:39:08.059181Z"
+  },
+  {
+    "ticket_id": "TCK-4EC34C2E",
+    "reason": "Draft answer failed validation twice: FAIL: The draft claims that \"Submitted documents in your record include an attested grade 12 certificate,\" but the tool output only confirms presence of 'grade_12_certificate' and 'transcript' without specifying attestation status.",
+    "case_summary": "{\"applicant_id\":\"APP-009\",\"curriculum\":\"British (GCE)\",\"facts\":{\"name\":\"Henry Whitfield\",\"country_of_origin\":\"United Kingdom\",\"stated_curriculum_on_file\":\"British (GCE)\",\"last_eligibility_check\":\"curr-uk-001=UNDETERMINABLE, except-003=UNDETERMINABLE, except-001=UNDETERMINABLE\"},\"documents\":{\"present\":[\"grade_12_certificate\",\"transcript\",\"passport_copy\",\"emirates_id_copy\"],\"missing\":[],\"invalid\":[],\"error\":null},\"open_questions\":[\"Eligibility undeterminable for rule(s): curr-uk-001, except-003, except-001.\"],\"assumptions\":[\"Assumed curriculum 'British (GCE)' from the applicant's on-file record; confirm with the applicant if this has changed.\"],\"tool_history\":[{\"step\":1,\"tool\":\"get_applicant_record\",\"args\":{\"applicant_id\":\"APP-009\"},\"result_summary\":\"found APP-009 (Henry Whitfield)\",\"timestamp\":\"2026-10-15T01:38:43.852620Z\"},{\"step\":2,\"tool\":\"check_documents\",\"args\":{\"applicant_id\":\"APP-009\",\"curriculum\":\"British (GCE)\"},\"result_summary\":\"present=['grade_12_certificate', 'transcript', 'passport_copy', 'emirates_id_copy'], missing=[], invalid=[]\",\"timestamp\":\"2026-10-15T01:38:51.351338Z\"},{\"step\":3,\"tool\":\"evaluate_eligibility\",\"args\":{\"case_state\":{\"applicant_id\":\"APP-009\",\"curriculum\":\"British (GCE)\"}},\"result_summary\":\"verdicts=[curr-uk-001[ASSUMPTION]=UNDETERMINABLE, except-003[OFFICIAL]=UNDETERMINABLE, except-001[OFFICIAL]=UNDETERMINABLE], undeterminable=['curr-uk-001', 'except-003', 'except-001']\",\"timestamp\":\"2026-10-15T01:38:51.357335Z\"},{\"step\":4,\"tool\":\"search_requirements\",\"args\":{\"query\":\"required documents for equivalency application for British (GCE) curriculum Grade 12 certificate\"},\"result_summary\":\"5 result(s), top=elig-002 [OFFICIAL] (score=0.6281)\",\"timestamp\":\"2026-10-15T01:38:59.353061Z\"},{\"step\":5,\"tool\":\"escalate_to_human\",\"args\":{\"reason\":\"validation_failed_twice\"},\"result_summary\":\"ticket TCK-785FFEAC queued (SIMULATED)\",\"timestamp\":\"2026-10-15T01:39:08.078786Z\"}]}",
+    "label": "SIMULATED",
+    "status": "queued",
+    "created_at": "2026-10-15T01:40:08.742025Z"
+  },
+  {
+    "ticket_id": "TCK-75F69AEB",
+    "reason": "Draft answer failed validation twice: Missing required section: 'Verified'.; Missing required section: 'Assumed'.; Missing required section: 'Simulated'.; Missing required section: 'Next step'. | final draft: Still nothing structured.",
+    "case_summary": "{\"applicant_id\":null,\"curriculum\":null,\"facts\":{},\"documents\":null,\"open_questions\":[],\"assumptions\":[],\"tool_history\":[{\"step\":1,\"tool\":\"validate_draft\",\"args\":{\"attempt\":1},\"result_summary\":\"FAILED: Missing required section: 'Verified'.; Missing required section: 'Assumed'.; Missing required section: 'Simulated'.; Missing required section: 'Next step'. | draft: No structure at all here.\",\"timestamp\":\"2026-10-15T01:58:43.337844Z\"},{\"step\":2,\"tool\":\"validate_draft\",\"args\":{\"attempt\":2},\"result_summary\":\"FAILED: Missing required section: 'Verified'.; Missing required section: 'Assumed'.; Missing required section: 'Simulated'.; Missing required section: 'Next step'. | draft: Still nothing structured.\",\"timestamp\":\"2026-10-15T01:58:43.337844Z\"}]}",
+    "label": "SIMULATED",
+    "status": "queued",
+    "created_at": "2026-10-15T01:58:43.337844Z"
+  }
+]

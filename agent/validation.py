@@ -34,7 +34,18 @@ from schemas import CaseState
 
 REQUIRED_SECTIONS = ["Verified", "Assumed", "Simulated", "Next step"]
 
-_TRIVIAL_VERIFIED_VALUES = {"none", "none yet", "n/a", "na", "nothing", "nothing yet", "-"}
+_TRIVIAL_VERIFIED_PATTERN = re.compile(r"(?i)^(no\b|none\b|nothing\b|n/?a\b|not\b)")
+
+
+def _is_trivial_verified(text: str) -> bool:
+    """True if `text` makes no substantive claim (a hedge/negation like "None
+    yet" or "No verified information is available yet"), so it needs no
+    grounding. Matched by leading hedge word rather than an exact-phrase set,
+    since a real model phrases "nothing to report" many different ways --
+    an exact-match set was missing most of them and forced grounding on
+    answers that were already honestly saying there's nothing to ground."""
+    stripped = text.strip(" .-*•")
+    return not stripped or bool(_TRIVIAL_VERIFIED_PATTERN.match(stripped))
 
 _ELIGIBILITY_PATTERN = re.compile(
     r"\b(eligible|ineligible|equivalent to|equivalency (?:is|has)|meets? the requirements?|"
@@ -74,7 +85,7 @@ def check_requirement_claims_grounded(draft: str, case_state: CaseState) -> list
     verified_text = _extract_section(draft, "Verified")
     if not verified_text:
         return []
-    if verified_text.strip(" .").lower() in _TRIVIAL_VERIFIED_VALUES:
+    if _is_trivial_verified(verified_text):
         return []
 
     has_official_chunk = any(

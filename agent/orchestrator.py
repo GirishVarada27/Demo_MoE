@@ -69,7 +69,11 @@ def _summarize_result(name: str, result: Any) -> str:
     if name == "get_applicant_record":
         return f"found {result.applicant.applicant_id} ({result.applicant.name})" if result.found else "not found"
     if name == "check_documents":
-        return f"present={result.present}, missing={result.missing}, invalid={[d.doc_type for d in result.invalid]}"
+        invalid_desc = [f"{d.doc_type} ({d.reason})" for d in result.invalid]
+        return (
+            f"present (attestation/expiry/curriculum checks all passed)={result.present}, "
+            f"missing={result.missing}, invalid={invalid_desc}"
+        )
     if name == "evaluate_eligibility":
         verdicts = ", ".join(f"{r.chunk_id}[{r.label}]={r.verdict}" for r in result.rule_results)
         return f"verdicts=[{verdicts}], undeterminable={result.undeterminable_rule_ids}"
@@ -129,6 +133,18 @@ def _apply_result_to_case_state(case_state: CaseState, name: str, args: dict, re
 
     elif name == "escalate_to_human":
         case_state.facts["escalation_ticket_id"] = result.ticket.ticket_id
+
+
+def _log_validation_failure(case_state: CaseState, attempt: int, draft: str, failures: list[str]) -> None:
+    """Log a failed validation attempt to the trace, with the exact failure
+    reason(s) and the draft that failed -- so the trace panel (and anyone
+    diagnosing an escalation) can see *why*, not just that it happened."""
+    _log_tool_call(
+        case_state,
+        "validate_draft",
+        {"attempt": attempt},
+        f"FAILED: {'; '.join(failures)} | draft: {draft}",
+    )
 
 
 def _log_tool_call(case_state: CaseState, name: str, args: dict, result_summary: str) -> None:
@@ -250,6 +266,7 @@ def run_turn(
 
             if not revision_attempted:
                 revision_attempted = True
+                _log_validation_failure(case_state, attempt=1, draft=draft, failures=validation.failures)
                 messages.append({"role": "assistant", "content": draft})
                 turn_messages.append({"role": "assistant", "content": draft})
                 revision_request = (
@@ -263,8 +280,13 @@ def run_turn(
                 turn_messages.append({"role": "user", "content": revision_request})
                 continue
 
+            _log_validation_failure(case_state, attempt=2, draft=draft, failures=validation.failures)
             escalation = escalate_to_human(
-                reason="Draft answer failed validation twice: " + "; ".join(validation.failures),
+                reason=(
+                    "Draft answer failed validation twice: "
+                    + "; ".join(validation.failures)
+                    + f" | final draft: {draft}"
+                ),
                 case_summary=case_state.model_dump_json(),
             )
             _log_tool_call(

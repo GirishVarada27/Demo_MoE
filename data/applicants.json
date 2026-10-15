@@ -183,7 +183,7 @@
       { "doc_type": "passport_copy", "attested": false, "issue_date": "2020-09-01", "expiry_date": "2030-09-01" },
       { "doc_type": "emirates_id_copy", "attested": false, "issue_date": "2024-05-01", "expiry_date": "2027-05-01" }
     ],
-    "expected_outcome": "Complete, attested file for a British-curriculum applicant with strong grades (3 A-level passes at A/B/B); expect equivalency computed on the standard path directly, with no need for the except-003 exception mechanism."
+    "expected_outcome": "Complete, attested file for a British-curriculum applicant with strong grades (3 A-level passes at A/B/B), with no need for the except-003 exception mechanism -- but the knowledge base has no officially-confirmed numeric British-curriculum threshold (curr-uk-001 is an ASSUMPTION gap), so evaluate_eligibility correctly returns UNDETERMINABLE rather than a fabricated PASS. Expect the agent to report the complete documents as VERIFIED, state plainly that the exact threshold is unconfirmed, and NOT escalate automatically just because of that -- escalation is for the applicant to request if they want a binding determination."
   },
   {
     "applicant_id": "APP-010",

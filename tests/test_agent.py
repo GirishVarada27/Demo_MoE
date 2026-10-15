@@ -174,8 +174,12 @@ def test_run_turn_revises_once_then_escalates_on_persistent_validation_failure(t
 
     assert "escalated" in result.lower()
     tool_names = [t.tool for t in case_state.tool_history]
-    assert tool_names == ["escalate_to_human"]
-    assert case_state.tool_history[0].args == {"reason": "validation_failed_twice"}
+    assert tool_names == ["validate_draft", "validate_draft", "escalate_to_human"]
+    assert case_state.tool_history[-1].args == {"reason": "validation_failed_twice"}
+    # The trace captures the exact failure reason and the draft that failed, per attempt.
+    assert "Missing required section" in case_state.tool_history[0].result_summary
+    assert "Sure, here's an answer with no structure at all." in case_state.tool_history[0].result_summary
+    assert "Still no structure here either." in case_state.tool_history[1].result_summary
 
 
 def test_run_turn_revision_succeeds_on_second_draft():
@@ -191,7 +195,10 @@ def test_run_turn_revision_succeeds_on_second_draft():
     result = run_turn(case_state, [], "hi", client=object(), model="fake-model", create_fn=create_fn)
 
     assert result == good_draft
-    assert case_state.tool_history == []  # no escalation needed -- the revision passed
+    # Exactly one failed attempt logged (the first draft); the revision passed, no escalation.
+    tool_names = [t.tool for t in case_state.tool_history]
+    assert tool_names == ["validate_draft"]
+    assert "An answer missing all the required sections." in case_state.tool_history[0].result_summary
 
 
 def test_run_turn_llm_verifier_fail_triggers_revision_then_escalation(tmp_path, monkeypatch):
