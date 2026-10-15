@@ -60,9 +60,10 @@ def test_documents_question_uses_search_requirements_only(monkeypatch):
 def test_missing_anything_question_looks_up_applicant_then_checks_documents():
     case_state = CaseState()
     draft = (
-        "Verified: Your transcript was submitted but is not yet attested; your certificate, "
-        "passport, and Emirates ID are all present and valid.\nAssumed: None.\n"
-        "Simulated: Applicant and document records were looked up from the mock case file.\n"
+        "Verified: None.\nAssumed: None.\n"
+        "Simulated: Applicant and document records were looked up from the mock case file; your "
+        "transcript was submitted but is not yet attested, and your certificate, passport, and "
+        "Emirates ID are all present and valid.\n"
         "Next step: Get your transcript attested and resubmit it."
     )
     create_fn = dispatching_create(
@@ -100,9 +101,10 @@ def test_cannot_get_attestation_triggers_revalidation_and_changed_plan(tmp_path,
     conversation: list[dict] = []
 
     turn1_draft = (
-        "Verified: Your transcript was submitted but is not yet attested; certificate, passport, "
-        "and Emirates ID are all present and valid.\nAssumed: None.\n"
-        "Simulated: Applicant and document records were looked up from the mock case file.\n"
+        "Verified: None.\nAssumed: None.\n"
+        "Simulated: Applicant and document records were looked up from the mock case file; your "
+        "transcript was submitted but is not yet attested, and certificate, passport, and "
+        "Emirates ID are all present and valid.\n"
         "Next step: Get your transcript attested and resubmit it."
     )
     create_fn_1 = dispatching_create(
@@ -126,9 +128,10 @@ def test_cannot_get_attestation_triggers_revalidation_and_changed_plan(tmp_path,
     steps_after_turn1 = len(case_state.tool_history)
 
     turn2_draft = (
-        "Verified: Attestation cannot be obtained, so standard document verification cannot proceed "
-        "for this requirement.\nAssumed: None.\n"
-        "Simulated: An escalation ticket was filed in the mock case-management queue.\n"
+        "Verified: None.\nAssumed: None.\n"
+        "Simulated: Attestation cannot be obtained through the normal process, so standard document "
+        "verification cannot proceed for this requirement; an escalation ticket was filed in the "
+        "mock case-management queue.\n"
         "Next step: A human reviewer will follow up about alternative ways to verify your transcript."
     )
     create_fn_2 = dispatching_create(

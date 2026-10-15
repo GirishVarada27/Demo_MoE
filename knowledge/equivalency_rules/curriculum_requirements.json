@@ -9,8 +9,8 @@
   {
     "id": "curr-us-002",
     "topic": "curriculum_requirements",
-    "text": "Exact baseline SAT Math and TOEFL minimum passing scores for American-curriculum Grade 12 equivalency are cited on secondary/consultancy sites but were not confirmed on an official MOE or u.ae page in this session.",
-    "source_url": null,
+    "text": "Secondary-sourced baseline thresholds for American-curriculum Grade 12 equivalency: SAT Math >= 450 (or EmSAT Achieve Math >= 500 as an alternative route), and TOEFL iBT >= 61 (or IELTS Academic >= 5.0, or EmSAT English >= 1100 as alternative routes). These numbers come from a translated copy of Ministerial Decision No. 199 of 2019 hosted on ibo.org (not moe.gov.ae/u.ae directly, and from 2019 -- not confirmed still current), and are corroborated by an independent source: GEMS American Academy Abu Dhabi's own admissions guide states the identical thresholds for UAE-resident American-curriculum applicants. Not confirmed on an official MOE or u.ae page in this session -- treat as provisional/ASSUMED, not VERIFIED, and say so explicitly if used to compute an eligibility verdict.",
+    "source_url": "https://ibo.org/contentassets/1b11a2a3337345228cf611e04f5b4758/ministerial-decision-199-for-the-year-2019.pdf",
     "label": "ASSUMPTION"
   },
   {

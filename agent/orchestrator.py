@@ -19,8 +19,9 @@ from typing import Any, Callable
 import config
 from agent.prompts import SYSTEM_PROMPT
 from agent.validation import validate_draft
-from schemas import CaseState, EligibilityCaseState, ToolCallTrace, UserReportedFact
+from schemas import CaseState, EligibilityCaseState, EscalateToHumanResult, EscalationTicket, ToolCallTrace, UserReportedFact
 from tools import TOOL_FUNCTIONS, TOOL_SCHEMAS
+from tools.document_check import ATTESTATION_REQUIRED_DOC_TYPES
 from tools.escalation import escalate_to_human
 
 MAX_ITERATIONS = 6
@@ -70,8 +71,11 @@ def _summarize_result(name: str, result: Any) -> str:
         return f"found {result.applicant.applicant_id} ({result.applicant.name})" if result.found else "not found"
     if name == "check_documents":
         invalid_desc = [f"{d.doc_type} ({d.reason})" for d in result.invalid]
+        attested_present = [d for d in result.present if d in ATTESTATION_REQUIRED_DOC_TYPES]
+        other_present = [d for d in result.present if d not in ATTESTATION_REQUIRED_DOC_TYPES]
         return (
-            f"present (attestation/expiry/curriculum checks all passed)={result.present}, "
+            f"present and attested (attestation/expiry/curriculum checks passed)={attested_present}, "
+            f"present (no attestation required for this doc type; expiry/curriculum checks passed)={other_present}, "
             f"missing={result.missing}, invalid={invalid_desc}"
         )
     if name == "evaluate_eligibility":
@@ -147,8 +151,42 @@ def _apply_result_to_case_state(case_state: CaseState, name: str, args: dict, re
                 f"User reports: '{fact_value}' (as '{fact_key}'), which conflicts with the "
                 f"on-file fact '{existing}'. Treating the user-reported fact as current."
             )
-            if note not in case_state.open_questions:
-                case_state.open_questions.append(note)
+        else:
+            # Not a strict key collision, but still something that changes the
+            # picture -- surface it structurally rather than only in conversation
+            # text, so re-planning actually accounts for it.
+            note = (
+                f"User-reported: '{fact_value}' (as '{fact_key}'). Re-verify any related "
+                "checks against this before answering."
+            )
+        if note not in case_state.open_questions:
+            case_state.open_questions.append(note)
+
+
+def _escalate_once(case_state: CaseState, reason: str, case_summary: str) -> tuple[EscalateToHumanResult, bool]:
+    """At most one escalation ticket per case -- if one already exists for
+    this case, reuse it instead of filing a new one every time something
+    escalates. Returns (result, reused)."""
+    existing_ticket_id = case_state.facts.get("escalation_ticket_id")
+    if existing_ticket_id:
+        reused_ticket = EscalationTicket(
+            ticket_id=existing_ticket_id,
+            reason=reason,
+            case_summary=case_summary,
+            created_at=datetime.now(timezone.utc),
+        )
+        return EscalateToHumanResult(ticket=reused_ticket), True
+
+    result = escalate_to_human(reason=reason, case_summary=case_summary)
+    if result.ticket:
+        # Record it here, not just via _apply_result_to_case_state -- that path
+        # only runs when the MODEL calls escalate_to_human as a regular tool
+        # choice. The orchestrator's own internal escalation triggers (tool
+        # failed twice, validation failed twice, max iterations, model call
+        # failed) call this function directly and need the ticket id recorded
+        # too, or the "reuse" check above would never find it next time.
+        case_state.facts["escalation_ticket_id"] = result.ticket.ticket_id
+    return result, False
 
 
 def _log_validation_failure(case_state: CaseState, attempt: int, draft: str, failures: list[str]) -> None:
@@ -251,7 +289,8 @@ def run_turn(
     for _ in range(MAX_ITERATIONS):
         response, call_error = _call_model_with_retry(create, model, messages)
         if response is None:
-            escalation = escalate_to_human(
+            escalation, reused = _escalate_once(
+                case_state,
                 reason=f"Azure OpenAI chat completion call failed twice: {call_error}",
                 case_summary=case_state.model_dump_json(),
             )
@@ -259,7 +298,7 @@ def run_turn(
                 case_state,
                 "escalate_to_human",
                 {"reason": "model_call_failed"},
-                _summarize_result("escalate_to_human", escalation),
+                _summarize_result("escalate_to_human", escalation) + (" (reused existing ticket)" if reused else ""),
             )
             ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
             fallback = (
@@ -298,7 +337,8 @@ def run_turn(
                 continue
 
             _log_validation_failure(case_state, attempt=2, draft=draft, failures=validation.failures)
-            escalation = escalate_to_human(
+            escalation, reused = _escalate_once(
+                case_state,
                 reason=(
                     "Draft answer failed validation twice: "
                     + "; ".join(validation.failures)
@@ -310,7 +350,7 @@ def run_turn(
                 case_state,
                 "escalate_to_human",
                 {"reason": "validation_failed_twice"},
-                _summarize_result("escalate_to_human", escalation),
+                _summarize_result("escalate_to_human", escalation) + (" (reused existing ticket)" if reused else ""),
             )
             ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
             fallback = (
@@ -358,7 +398,8 @@ def run_turn(
                     result_json = result.model_dump_json()
                 else:
                     last_summary = case_state.tool_history[-1].result_summary
-                    escalation = escalate_to_human(
+                    escalation, reused = _escalate_once(
+                        case_state,
                         reason=f"Tool '{name}' failed twice: {last_summary}",
                         case_summary=case_state.model_dump_json(),
                     )
@@ -366,7 +407,7 @@ def run_turn(
                         case_state,
                         "escalate_to_human",
                         {"reason": f"tool_failure:{name}"},
-                        _summarize_result("escalate_to_human", escalation),
+                        _summarize_result("escalate_to_human", escalation) + (" (reused existing ticket)" if reused else ""),
                     )
                     ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
                     result_json = json.dumps({"error": last_summary, "escalated": True, "ticket_id": ticket_id})
@@ -377,7 +418,8 @@ def run_turn(
             messages.append(tool_msg)
             turn_messages.append(tool_msg)
 
-    escalation = escalate_to_human(
+    escalation, reused = _escalate_once(
+        case_state,
         reason="Agent reached the maximum tool-call iterations without producing a validated answer.",
         case_summary=case_state.model_dump_json(),
     )
@@ -385,7 +427,7 @@ def run_turn(
         case_state,
         "escalate_to_human",
         {"reason": "max_iterations_reached"},
-        _summarize_result("escalate_to_human", escalation),
+        _summarize_result("escalate_to_human", escalation) + (" (reused existing ticket)" if reused else ""),
     )
     ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
     fallback = (

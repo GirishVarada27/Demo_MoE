@@ -88,10 +88,15 @@ def test_requirement_claims_grounded_ignores_assumption_only_search_result():
     assert failures
 
 
-def test_requirement_claims_grounded_passes_with_successful_check_documents():
+def test_requirement_claims_grounded_rejects_check_documents_alone():
+    """Point 6: check_documents operates on mock/synthetic applicant data, so
+    even a successful result never grounds a VERIFIED claim on its own --
+    that kind of finding belongs under Simulated instead."""
     draft = "Verified: The transcript is missing from the submitted documents.\nAssumed: None.\nSimulated: None.\nNext step: none."
     case_state = CaseState(tool_history=[_trace("check_documents", "present=[], missing=['transcript'], invalid=[]")])
-    assert check_requirement_claims_grounded(draft, case_state) == []
+    failures = check_requirement_claims_grounded(draft, case_state)
+    assert failures
+    assert "Simulated" in failures[0]
 
 
 def test_requirement_claims_grounded_ignores_failed_check_documents():

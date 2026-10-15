@@ -157,11 +157,18 @@ def test_evaluate_eligibility_american_exception_case_passes():
     assert by_id["except-001"].verdict == "UNDETERMINABLE"
 
 
-def test_evaluate_eligibility_american_without_msat_is_undeterminable():
+def test_evaluate_eligibility_american_without_msat_leaves_exception_path_undeterminable():
+    """except-002 (the MSAT exception path) genuinely has no input data for
+    APP-001 (no MSAT/IELTS scores) and stays UNDETERMINABLE. But curr-us-002
+    now has real SAT Math/TOEFL numbers to check against and APP-001 has
+    those scores, so it's no longer undeterminable -- it computes a
+    provisional PASS instead (see docs/assumptions.md)."""
     result = evaluate_eligibility(EligibilityCaseState(applicant_id="APP-001", curriculum="American (US High School Diploma)"))
     by_id = {r.chunk_id: r for r in result.rule_results}
     assert by_id["except-002"].verdict == "UNDETERMINABLE"
-    assert "curr-us-002" in result.undeterminable_rule_ids
+    assert "curr-us-002" not in result.undeterminable_rule_ids
+    assert by_id["curr-us-002"].verdict == "PASS"
+    assert "verify with MoE" in by_id["curr-us-002"].reason
 
 
 def test_evaluate_eligibility_unsupported_curriculum_returns_none_chunk():

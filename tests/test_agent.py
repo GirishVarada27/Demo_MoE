@@ -71,8 +71,8 @@ def test_run_turn_updates_case_state_on_contradictory_curriculum_without_restart
         {"role": "assistant", "content": "prior answer"},
     ]
     draft = (
-        "Verified: Document check completed for the British (GCE) curriculum.\nAssumed: None.\n"
-        "Simulated: None this turn.\n"
+        "Verified: None.\nAssumed: None.\n"
+        "Simulated: Document check completed for the British (GCE) curriculum against the mock case file.\n"
         "Next step: Share any remaining documents if something was flagged as missing or invalid."
     )
     create_fn = _dispatching_create(

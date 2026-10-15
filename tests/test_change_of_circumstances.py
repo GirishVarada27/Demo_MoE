@@ -48,9 +48,10 @@ def test_transcript_attestation_blocker_is_recorded_and_changes_the_plan(tmp_pat
     conversation: list[dict] = []
 
     turn1_draft = (
-        "Verified: Your transcript is on file but not attested; certificate, passport, and "
-        "Emirates ID are all present and valid.\nAssumed: None.\n"
-        "Simulated: Applicant and document records were looked up from the mock case file.\n"
+        "Verified: None.\nAssumed: None.\n"
+        "Simulated: Applicant and document records were looked up from the mock case file; your "
+        "transcript is on file but not attested, and certificate, passport, and Emirates ID are "
+        "present and valid.\n"
         "Next step: Get your transcript attested and resubmit it."
     )
     create_fn_1 = dispatching_create(
@@ -72,10 +73,12 @@ def test_transcript_attestation_blocker_is_recorded_and_changes_the_plan(tmp_pat
     steps_after_turn1 = len(case_state.tool_history)
 
     turn2_draft = (
-        "Verified: Your transcript remains on file as not attested; certificate, passport, and "
-        "Emirates ID are present and valid.\nAssumed: None.\n"
-        "Simulated: Since you reported being unable to obtain attestation through the normal "
-        "process, I searched for an alternative route and filed an escalation ticket.\n"
+        "Verified: None.\nAssumed: None.\n"
+        "Simulated: Per the mock case file, your transcript remains on file as not attested; "
+        "certificate, passport, and Emirates ID are present and valid. I searched for an "
+        "alternative attestation route and filed an escalation ticket.\n"
+        "What you told me: You said you cannot get your transcript attested through the normal "
+        "process.\n"
         "Next step: A human reviewer will follow up on alternative attestation options or "
         "exception paths."
     )

@@ -34,9 +34,32 @@ statement of the required attestation order.
 SAT Math and TOEFL requirement for American-curriculum equivalency (only
 the *existence* of this requirement is officially confirmed, via the
 exception article's alternatives).
+**Why unconfirmed, but reasonably well-sourced:** a translated copy of
+Ministerial Decision No. 199 of 2019, hosted on ibo.org (not moe.gov.ae/
+u.ae directly, and from 2019 — may be superseded), states SAT Math >= 450
+(or EmSAT Achieve Math >= 500 as an alternative) and TOEFL iBT >= 61 (or
+IELTS Academic >= 5.0, or EmSAT English >= 1100). These numbers are
+corroborated by an independent source — GEMS American Academy Abu Dhabi's
+own admissions guide states the identical thresholds for UAE-resident
+American-curriculum applicants. Two independent sources agreeing is
+better grounding than a single secondary blog, but neither is the
+Ministry's own current equivalency page, so this stays ASSUMPTION, not
+OFFICIAL. `tools/equivalency_calc.py::evaluate_eligibility` now computes a
+PASS/FAIL from these numbers when an applicant's SAT Math/TOEFL scores are
+available, but always labels the result provisional ("based on assumed
+rules, verify with MoE") rather than VERIFIED.
 **To confirm:** find the official criteria document referenced as
-"Ministerial Decision No. 4443 of 2001" or its current successor, which
-should state baseline thresholds directly.
+"Ministerial Decision No. 4443 of 2001" (an older decision than 199/2019 —
+unclear how the two relate) or whichever is the current successor, and
+read it directly on an official moe.gov.ae/u.ae page rather than a
+third-party-hosted translation.
+
+**Note on curr-uk-001/curr-in-001 below: these were NOT given the same
+treatment.** Only curr-us-002 was upgraded to a provisional computed
+threshold in this pass, since that's the specific gap raised in testing;
+British and Indian curricula still return UNDETERMINABLE unconditionally
+whenever the only grounding is their ASSUMPTION chunk, pending the same
+kind of corroborated secondary-source research curr-us-002 just got.
 
 ## curr-uk-001 — British curriculum thresholds
 **Unverified claim:** minimum A-level/AS-level pass counts and
@@ -93,8 +116,11 @@ In order of how much a wrong answer would mislead a real applicant:
    cause a rejected application or wasted embassy visits.
 4. **Detailed document checklist** (doc-004) — missing a required document
    causes real-world application delay.
-5. **Curriculum-specific score thresholds** (curr-us-002, curr-uk-001,
-   curr-in-001) — determines eligibility outcome directly.
+5. **Curriculum-specific score thresholds** — determines eligibility
+   outcome directly. curr-us-002 now has corroborated (two independent
+   sources) secondary numbers and a provisional computed verdict; verify
+   it against the current official page before trusting it further.
+   curr-uk-001/curr-in-001 remain fully open (no numbers added yet).
 6. **Whether the 2017-2018-scoped exception path is still active**
    (except-001/002/003) — could misrepresent appeal options as currently
    available when they may not be.

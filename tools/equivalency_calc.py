@@ -3,13 +3,19 @@
 Evaluates a case_state (applicant id + the curriculum to evaluate under)
 rule-by-rule against the curriculum_requirements and exceptions knowledge
 chunks relevant to that curriculum family. Every rule gets a verdict of
-PASS, FAIL, or UNDETERMINABLE -- UNDETERMINABLE whenever the only grounding
-is an ASSUMPTION chunk, the applicant's grades don't contain the fields
-needed to evaluate a chunk's criteria, or (for except-003) the chunk's own
-applicability depends on an unconfirmed threshold elsewhere. This never
-fabricates a PASS/FAIL where the knowledge base can't actually support one
-(CLAUDE.md rule 3) -- see docs/assumptions.md for why each ASSUMPTION
-chunk is unconfirmed.
+PASS, FAIL, or UNDETERMINABLE. UNDETERMINABLE is reserved for when a chunk
+truly has no rule to apply (e.g. except-001's temporal-scope question, or
+an ASSUMPTION chunk with no computable criteria) or the applicant's grades
+genuinely lack the input data a chunk needs (e.g. except-002 without any
+MSAT/IELTS score) -- not just because a chunk happens to be ASSUMPTION-
+labeled. curr-us-002 is the one ASSUMPTION chunk with actual (secondary-
+sourced, corroborated by two independent sources -- see docs/
+assumptions.md) numeric thresholds, so it computes a provisional PASS/FAIL
+when the applicant's SAT Math/TOEFL-family scores are present, always
+reasoned as "based on assumed rules ... verify with MoE" rather than
+VERIFIED -- this never fabricates a PASS/FAIL the knowledge base can't
+actually support (CLAUDE.md rule 3), it just stops conflating "unconfirmed
+official source" with "no usable information at all."
 """
 
 from __future__ import annotations
@@ -55,7 +61,45 @@ def _parse_float(value: str) -> float | None:
         return None
 
 
+def _evaluate_curr_us_002(grades_by_subject: dict[str, str]) -> tuple[str, str]:
+    sat_math_raw = grades_by_subject.get("sat math")
+    emsat_math_raw = grades_by_subject.get("emsat math") or grades_by_subject.get("msat math")
+    toefl_raw = grades_by_subject.get("toefl")
+    ielts_raw = grades_by_subject.get("ielts")
+    emsat_english_raw = grades_by_subject.get("emsat english") or grades_by_subject.get("english msat")
+
+    if sat_math_raw is None and emsat_math_raw is None:
+        return "UNDETERMINABLE", "No SAT Math or EmSAT Math score is present in the applicant's subject grades to evaluate against this assumed threshold."
+    if toefl_raw is None and ielts_raw is None and emsat_english_raw is None:
+        return "UNDETERMINABLE", "No TOEFL, IELTS, or EmSAT English score is present in the applicant's subject grades to evaluate against this assumed threshold."
+
+    sat_math = _parse_float(sat_math_raw) if sat_math_raw is not None else None
+    emsat_math = _parse_float(emsat_math_raw) if emsat_math_raw is not None else None
+    meets_math = (sat_math is not None and sat_math >= 450) or (emsat_math is not None and emsat_math >= 500)
+
+    toefl = _parse_float(toefl_raw) if toefl_raw is not None else None
+    ielts = _parse_float(ielts_raw) if ielts_raw is not None else None
+    emsat_english = _parse_float(emsat_english_raw) if emsat_english_raw is not None else None
+    meets_english = (
+        (toefl is not None and toefl >= 61)
+        or (ielts is not None and ielts >= 5.0)
+        or (emsat_english is not None and emsat_english >= 1100)
+    )
+
+    basis = (
+        "based on assumed rules (SAT Math >= 450 or EmSAT Math >= 500, and TOEFL >= 61 or "
+        "IELTS >= 5.0 or EmSAT English >= 1100 -- secondary-sourced and corroborated by two "
+        "independent sources per curr-us-002, but not officially confirmed) -- verify with MoE."
+    )
+    if meets_math and meets_english:
+        return "PASS", f"Provisional PASS, {basis}"
+    return "FAIL", f"Provisional FAIL, {basis}"
+
+
 def _evaluate_chunk(chunk: RuleChunk, grades_by_subject: dict[str, str]) -> tuple[str, str]:
+    if chunk.id == "curr-us-002":
+        return _evaluate_curr_us_002(grades_by_subject)
+
     if chunk.label == "ASSUMPTION":
         return "UNDETERMINABLE", f"Chunk {chunk.id} is an unverified assumption, not an official rule; see docs/assumptions.md."
 
