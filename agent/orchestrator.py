@@ -23,6 +23,7 @@ from agent.validation import validate_draft
 from schemas import (
     CaseState,
     CheckDocumentsResult,
+    ChunkRelevanceNote,
     EligibilityCaseState,
     EscalateToHumanResult,
     EvaluateEligibilityResult,
@@ -41,6 +42,18 @@ MAX_ITERATIONS = 6
 _CHAT_API_VERSION = "2024-02-01"
 _UNAVAILABLE_FACT_VALUES = {"unavailable", "no", "not available", "cannot obtain", "can't obtain", "none"}
 _NO_RULE_SENTINEL_CHUNK_ID = "NONE"
+# Tools whose mere invocation means this turn is about a specific applicant's
+# case, not a generic policy question -- drives _is_informational_turn.
+# escalate_to_human is included because calling it at all is itself a
+# decision about a specific case; there's no such thing as escalating "a
+# generic policy question" in the first place.
+_APPLICANT_SPECIFIC_TOOLS = {
+    "get_applicant_record",
+    "check_documents",
+    "evaluate_eligibility",
+    "create_draft_application",
+    "escalate_to_human",
+}
 
 
 def _unavailable_attested_doc_types(case_state: CaseState) -> list[str]:
@@ -154,12 +167,14 @@ def _handle_no_rule_found(case_state: CaseState, result: EvaluateEligibilityResu
     )
 
     if search_result.results:
+        candidate_id = search_result.results[0].chunk.id
         note = (
             f"evaluate_eligibility found no curriculum-specific rule chunk for '{curriculum}', but "
-            f"search_requirements found a possibly relevant chunk ({search_result.results[0].chunk.id}) "
-            "-- check whether it actually applies before concluding no rule exists."
+            f"search_requirements found a possibly relevant chunk ({candidate_id}) -- read it and "
+            "call record_chunk_relevance with your decision (applies/does_not_apply/"
+            "partially_applies) before concluding no rule exists."
         )
-        if note not in case_state.open_questions:
+        if note not in case_state.open_questions and candidate_id not in case_state.chunk_relevance:
             case_state.open_questions.append(note)
         return None
 
@@ -222,6 +237,39 @@ def _plain_language_failure_reason(failures: list[str]) -> str:
         if needle in lowered:
             return phrase
     return "part of my draft answer wasn't fully supported by what I'd actually verified this session"
+
+
+def _is_informational_turn(case_state: CaseState, turn_start_index: int) -> bool:
+    """True if this turn is a generic policy question, not about a specific
+    applicant's case -- at least one REAL tool was called this turn, and
+    none of them were applicant-specific. Restricted to TOOL_FUNCTIONS
+    names (not "validate_draft"/"escalate_to_human" trace entries the
+    orchestrator itself logs, which aren't tool choices the model made) --
+    otherwise a second validation-failure pass would see its own prior
+    "validate_draft" log entry and misread an answer-less turn (e.g. a bare
+    unstructured reply to "hi") as "informational"."""
+    turn_tools = {t.tool for t in case_state.tool_history[turn_start_index:] if t.tool in TOOL_FUNCTIONS}
+    return bool(turn_tools) and not (turn_tools & _APPLICANT_SPECIFIC_TOOLS)
+
+
+def _build_informational_fallback(case_state: CaseState, failures: list[str]) -> str:
+    """For a generic policy question whose draft still failed validation
+    after one revision: never escalate (there's no applicant case to
+    escalate), just answer plainly from the chunks actually retrieved this
+    session, say what couldn't be confirmed, and offer -- without creating
+    a ticket -- to escalate if the applicant wants a human to look at it."""
+    official_chunks = [c for c in case_state.retrieved_chunks.values() if c.label == "OFFICIAL"]
+    if official_chunks:
+        summary = " ".join(f"{c.text}" for c in official_chunks[:3])
+        intro = f"Here's what the official rules say: {summary}"
+    else:
+        intro = "I didn't find anything in the official rules directly relevant to your question."
+    return (
+        f"{intro} I wasn't able to fully confirm a complete answer from that alone -- "
+        f"{_plain_language_failure_reason(failures)}. Let me know if you'd like me to escalate "
+        "this question to a human reviewer for a definitive answer, or if you can tell me more "
+        "about your specific situation."
+    )
 
 
 def _build_client(settings: config.Settings | None = None):
@@ -295,7 +343,11 @@ def _apply_result_to_case_state(case_state: CaseState, name: str, args: dict, re
     if getattr(result, "error", None):
         return result
 
-    if name == "get_applicant_record" and result.found:
+    if name == "search_requirements":
+        for match in result.results:
+            case_state.retrieved_chunks.setdefault(match.chunk.id, match.chunk)
+
+    elif name == "get_applicant_record" and result.found:
         applicant = result.applicant
         case_state.applicant_id = applicant.applicant_id
         case_state.facts.setdefault("name", applicant.name)
@@ -342,6 +394,15 @@ def _apply_result_to_case_state(case_state: CaseState, name: str, args: dict, re
 
     elif name == "escalate_to_human":
         case_state.facts["escalation_ticket_id"] = result.ticket.ticket_id
+        case_state.escalation = result.ticket
+
+    elif name == "record_chunk_relevance":
+        case_state.chunk_relevance[result.chunk_id] = ChunkRelevanceNote(
+            chunk_id=result.chunk_id, decision=result.decision, reason=result.reason
+        )
+        case_state.open_questions = [
+            q for q in case_state.open_questions if result.chunk_id not in q
+        ]
 
     elif name == "record_user_fact":
         fact_key, fact_value = result.fact_key, result.fact_value
@@ -376,6 +437,7 @@ def _escalate_once(case_state: CaseState, reason: str, case_summary: str) -> tup
     if existing_ticket_id:
         result = append_to_ticket(existing_ticket_id, note=reason)
         if result.ticket:
+            case_state.escalation = result.ticket
             return result, True
         # The existing ticket id is stale/unreadable (e.g. a wiped mock
         # store) -- fall through and file a fresh one rather than lose the
@@ -387,9 +449,12 @@ def _escalate_once(case_state: CaseState, reason: str, case_summary: str) -> tup
         # only runs when the MODEL calls escalate_to_human as a regular tool
         # choice. The orchestrator's own internal escalation triggers (tool
         # failed twice, validation failed twice, max iterations, model call
-        # failed) call this function directly and need the ticket id recorded
-        # too, or the "reuse" check above would never find it next time.
+        # failed) call this function directly and need the ticket id (and
+        # full escalation state -- CaseState.escalation, injected into the
+        # model's context every turn) recorded too, or the "reuse" check
+        # above would never find it next time.
         case_state.facts["escalation_ticket_id"] = result.ticket.ticket_id
+        case_state.escalation = result.ticket
     return result, False
 
 
@@ -493,6 +558,7 @@ def run_turn(
     ]
     turn_messages: list[dict] = [{"role": "user", "content": user_message}]
     revision_attempted = False
+    turn_start_index = len(case_state.tool_history)
     seen_calls: dict[tuple[str, str], str] = {}  # (tool, canonical args) -> result JSON already returned this turn
 
     for _ in range(MAX_ITERATIONS):
@@ -530,23 +596,45 @@ def run_turn(
                 conversation.extend(turn_messages)
                 return draft
 
+            informational = _is_informational_turn(case_state, turn_start_index)
+
             if not revision_attempted:
                 revision_attempted = True
                 _log_validation_failure(case_state, attempt=1, draft=draft, failures=validation.failures)
                 messages.append({"role": "assistant", "content": draft})
                 turn_messages.append({"role": "assistant", "content": draft})
-                revision_request = (
-                    "Your draft answer failed validation for the following reason(s):\n"
-                    + "\n".join(f"- {f}" for f in validation.failures)
-                    + "\nRevise your answer to address every issue above. Include all four required "
-                    "sections (Verified, Assumed, Simulated, Next step), and make sure every "
-                    "eligibility/status statement follows a successful evaluate_eligibility call."
-                )
+                if informational:
+                    revision_request = (
+                        "Your draft answer failed validation for the following reason(s):\n"
+                        + "\n".join(f"- {f}" for f in validation.failures)
+                        + "\nThis is a general policy question, not about a specific applicant's case -- "
+                        "revise your answer using only the text of the knowledge chunks search_requirements "
+                        "actually retrieved this session, and cite their chunk id(s) under Verified. Do not "
+                        "call escalate_to_human for a question like this; if something still can't be "
+                        "confirmed from those chunks, say so plainly instead."
+                    )
+                else:
+                    revision_request = (
+                        "Your draft answer failed validation for the following reason(s):\n"
+                        + "\n".join(f"- {f}" for f in validation.failures)
+                        + "\nRevise your answer to address every issue above. Include all four required "
+                        "sections (Verified, Assumed, Simulated, Next step), and make sure every "
+                        "eligibility/status statement follows a successful evaluate_eligibility call."
+                    )
                 messages.append({"role": "user", "content": revision_request})
                 turn_messages.append({"role": "user", "content": revision_request})
                 continue
 
             _log_validation_failure(case_state, attempt=2, draft=draft, failures=validation.failures)
+
+            if informational:
+                # A generic policy question has no applicant case to escalate -- never file a
+                # ticket for one; answer from the retrieved chunks and offer escalation in words only.
+                fallback = _build_informational_fallback(case_state, validation.failures)
+                turn_messages.append({"role": "assistant", "content": fallback})
+                conversation.extend(turn_messages)
+                return fallback
+
             escalation, reused = _escalate_once(
                 case_state,
                 reason=(
@@ -598,6 +686,55 @@ def run_turn(
                 raw_args["simulate_failure"] = True
 
             call_key = (name, json.dumps(raw_args, sort_keys=True))
+
+            if (
+                name == "escalate_to_human"
+                and case_state.escalation is None
+                and case_state.applicant_id is None
+                and _is_informational_turn(case_state, turn_start_index)
+            ):
+                # Informational question, no applicant case on file -- there's nothing to
+                # escalate. Decline instead of filing a ticket for a generic policy question.
+                result_json = json.dumps(
+                    {
+                        "declined": True,
+                        "reason": (
+                            "This looks like a general informational question, not tied to a "
+                            "specific applicant case -- answer directly from the retrieved "
+                            "knowledge chunks instead of escalating."
+                        ),
+                    }
+                )
+                _log_tool_call(case_state, name, raw_args, "declined: informational question, no ticket created")
+                seen_calls[call_key] = result_json
+                tool_msg = {"role": "tool", "tool_call_id": tc.id, "content": result_json}
+                messages.append(tool_msg)
+                turn_messages.append(tool_msg)
+                continue
+
+            if name == "escalate_to_human" and case_state.escalation is not None:
+                # At most one ticket per case -- redirect a second escalate_to_human call (the
+                # model's own choice, not one of the orchestrator's internal triggers already
+                # routed through _escalate_once) to append to the existing ticket instead of
+                # creating a new one.
+                append_result = append_to_ticket(
+                    case_state.escalation.ticket_id, note=raw_args.get("reason", "Escalated again by the agent.")
+                )
+                if append_result.ticket:
+                    case_state.escalation = append_result.ticket
+                result_json = append_result.model_dump_json()
+                _log_tool_call(
+                    case_state,
+                    name,
+                    raw_args,
+                    _summarize_result("escalate_to_human", append_result) + " (appended to existing ticket -- not a new one)",
+                )
+                seen_calls[call_key] = result_json
+                tool_msg = {"role": "tool", "tool_call_id": tc.id, "content": result_json}
+                messages.append(tool_msg)
+                turn_messages.append(tool_msg)
+                continue
+
             if call_key in seen_calls:
                 # Same tool, same args, already called this turn -- reuse the result instead
                 # of invoking (and re-logging) it again.

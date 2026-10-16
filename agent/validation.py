@@ -26,6 +26,10 @@ escalates (CLAUDE.md rules 2 and 3). Two passes:
    - check_draft_application_caveated: if create_draft_application was
      called, evaluate_eligibility must have reached a determinable PASS/FAIL
      this session, or the draft must caveat the application as provisional.
+   - check_existing_escalation_referenced: if CaseState.escalation is set
+     (an open ticket from a prior trigger this session), any mention of
+     escalation in the draft must cite that ticket id, not read as a
+     proposal to escalate again or file a new one.
    If any rule-based check fails, the (costly) LLM verifier pass is
    skipped entirely -- there's no point double-checking a draft already
    known to be unsupported.
@@ -102,29 +106,62 @@ def check_required_sections(draft: str, case_state: CaseState | None = None) -> 
     return [f"Missing required section: '{section}'." for section in REQUIRED_SECTIONS if section.lower() not in lowered]
 
 
+_TOOL_RESULT_CITATION_PATTERN = re.compile(
+    r"\b(check_documents|evaluate_eligibility|get_applicant_record|create_draft_application|"
+    r"record_user_fact|the mock (?:case file|record|queue|store)|per your (?:file|record))\b",
+    re.IGNORECASE,
+)
+
+_OFFICIAL_CHUNK_ID_IN_SUMMARY_PATTERN = re.compile(r"([\w-]+)\s*\[OFFICIAL\]")
+
+
+def _official_chunk_ids_this_session(case_state: CaseState) -> set[str]:
+    """Chunk ids this session actually has an OFFICIAL-labeled hit for --
+    from CaseState.retrieved_chunks (populated by
+    agent.orchestrator._apply_result_to_case_state's search_requirements
+    branch) and, for sessions/tests that only populate tool_history
+    directly, the same ids as they appear in search_requirements/
+    evaluate_eligibility trace summaries. A Verified claim must cite one of
+    these ids by name, not just point at "some official chunk existed
+    somewhere this session"."""
+    ids = {cid for cid, chunk in case_state.retrieved_chunks.items() if chunk.label == "OFFICIAL"}
+    for entry in case_state.tool_history:
+        if entry.tool in ("search_requirements", "evaluate_eligibility"):
+            ids.update(_OFFICIAL_CHUNK_ID_IN_SUMMARY_PATTERN.findall(entry.result_summary))
+    return ids
+
+
 def check_requirement_claims_grounded(draft: str, case_state: CaseState) -> list[str]:
-    """VERIFIED means grounded in an OFFICIAL knowledge chunk -- not just
-    "some tool succeeded." check_documents/evaluate_eligibility operate on
-    SYNTHETIC/mock applicant data, so an applicant-specific finding from
+    """VERIFIED means grounded in an OFFICIAL knowledge chunk, cited by its
+    chunk id -- not just "some tool succeeded" or a vague appeal to "the
+    official knowledge base." check_documents/evaluate_eligibility operate
+    on SYNTHETIC/mock applicant data, so an applicant-specific finding from
     them (e.g. "your transcript isn't attested") belongs under SIMULATED,
     not VERIFIED, even though the *rule* behind it (attestation is
-    required) is OFFICIAL. Only an actual OFFICIAL-labeled chunk retrieved
-    this session grounds a Verified claim."""
+    required) is OFFICIAL -- and citing the tool/mock result directly is
+    rejected outright, regardless of what else was retrieved this session."""
     verified_text = _extract_section(draft, "Verified")
     if not verified_text:
         return []
     if _is_trivial_verified(verified_text):
         return []
 
-    has_official_chunk = any(
-        entry.tool in ("search_requirements", "evaluate_eligibility") and "[OFFICIAL]" in entry.result_summary
-        for entry in case_state.tool_history
-    )
-    if not has_official_chunk:
+    if _TOOL_RESULT_CITATION_PATTERN.search(verified_text):
         return [
-            f"The 'Verified' section claims '{verified_text}', but no OFFICIAL knowledge chunk was "
-            "retrieved this session to ground it (a mock-data tool result like check_documents "
-            "belongs under Simulated, not Verified)."
+            f"The 'Verified' section claims '{verified_text}', but it cites a tool/mock result "
+            "directly -- an applicant-specific finding from check_documents, evaluate_eligibility, "
+            "get_applicant_record, or similar belongs under Simulated, not Verified, even when the "
+            "underlying rule is official."
+        ]
+
+    official_ids = _official_chunk_ids_this_session(case_state)
+    if not any(chunk_id in verified_text for chunk_id in official_ids):
+        return [
+            f"The 'Verified' section claims '{verified_text}', but doesn't cite an OFFICIAL "
+            "knowledge chunk id retrieved this session (e.g. 'per attest-001') -- a general "
+            "appeal to the official knowledge base, or a mock-data tool result like "
+            "check_documents, doesn't ground a Verified claim on its own; that belongs under "
+            "Simulated or Assumed instead."
         ]
     return []
 
@@ -181,6 +218,27 @@ def check_draft_application_caveated(draft: str, case_state: CaseState) -> list[
     return []
 
 
+_ESCALATION_MENTION_PATTERN = re.compile(r"\bescalat\w*\b", re.IGNORECASE)
+
+
+def check_existing_escalation_referenced(draft: str, case_state: CaseState) -> list[str]:
+    """Once a case has an open ticket (CaseState.escalation, injected into
+    the model's context every turn), any mention of escalation in the
+    answer must reference that existing ticket id, not read as a proposal
+    to escalate again or open a new one."""
+    if case_state.escalation is None:
+        return []
+    if not _ESCALATION_MENTION_PATTERN.search(draft):
+        return []
+    if case_state.escalation.ticket_id in draft:
+        return []
+    return [
+        f"This case already has an open escalation ticket ({case_state.escalation.ticket_id}), but the "
+        "draft discusses escalation without referencing that existing ticket -- it must reference the "
+        "existing ticket, not propose escalating again or opening a new one."
+    ]
+
+
 def llm_verify(draft: str, case_state: CaseState, create: Callable[..., Any], model: str) -> list[str]:
     tool_outputs = "\n".join(f"- {entry.tool}({entry.args}) -> {entry.result_summary}" for entry in case_state.tool_history)
     messages = [
@@ -215,6 +273,7 @@ def validate_draft(
     failures += check_requirement_claims_grounded(draft, case_state)
     failures += check_eligibility_statements_grounded(draft, case_state)
     failures += check_draft_application_caveated(draft, case_state)
+    failures += check_existing_escalation_referenced(draft, case_state)
     if failures:
         return ValidationResult(passed=False, failures=failures)
 

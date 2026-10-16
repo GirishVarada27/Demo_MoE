@@ -10,6 +10,7 @@ registers with Azure OpenAI function calling.
 from __future__ import annotations
 
 from tools.applicant_lookup import GET_APPLICANT_RECORD_TOOL_SCHEMA, get_applicant_record
+from tools.chunk_relevance import RECORD_CHUNK_RELEVANCE_TOOL_SCHEMA, record_chunk_relevance
 from tools.document_check import CHECK_DOCUMENTS_TOOL_SCHEMA, check_documents
 from tools.draft_application import CREATE_DRAFT_APPLICATION_TOOL_SCHEMA, create_draft_application
 from tools.equivalency_calc import EVALUATE_ELIGIBILITY_TOOL_SCHEMA, evaluate_eligibility
@@ -25,6 +26,7 @@ TOOL_SCHEMAS = [
     CREATE_DRAFT_APPLICATION_TOOL_SCHEMA,
     ESCALATE_TO_HUMAN_TOOL_SCHEMA,
     RECORD_USER_FACT_TOOL_SCHEMA,
+    RECORD_CHUNK_RELEVANCE_TOOL_SCHEMA,
 ]
 
 TOOL_FUNCTIONS = {
@@ -35,4 +37,5 @@ TOOL_FUNCTIONS = {
     "create_draft_application": create_draft_application,
     "escalate_to_human": escalate_to_human,
     "record_user_fact": record_user_fact,
+    "record_chunk_relevance": record_chunk_relevance,
 }

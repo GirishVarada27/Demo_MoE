@@ -237,7 +237,7 @@ def test_run_turn_eligibility_statement_without_evaluate_eligibility_fails_valid
 def test_run_turn_tool_failure_retries_once_then_escalates(tmp_path, monkeypatch):
     monkeypatch.setattr("tools.escalation._QUEUE_PATH", tmp_path / "escalation_queue.json")
     case_state = CaseState()
-    draft = _PASS_SECTIONS.format(next_step="I've escalated this; a human will follow up.")
+    draft = _PASS_SECTIONS.format(next_step="A human reviewer has been notified and will follow up.")
     create_fn = _dispatching_create(
         [
             _FakeResponse(
@@ -267,7 +267,7 @@ def test_run_turn_tool_failure_retries_once_then_escalates(tmp_path, monkeypatch
 def test_run_turn_inject_failures_forces_simulate_failure(tmp_path, monkeypatch):
     monkeypatch.setattr("tools.escalation._QUEUE_PATH", tmp_path / "escalation_queue.json")
     case_state = CaseState()
-    draft = _PASS_SECTIONS.format(next_step="I've escalated this; a human will follow up.")
+    draft = _PASS_SECTIONS.format(next_step="A human reviewer has been notified and will follow up.")
     # The model requests a normal, non-failing lookup -- inject_failures overrides it anyway.
     create_fn = _dispatching_create(
         [

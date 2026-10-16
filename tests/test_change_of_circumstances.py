@@ -76,7 +76,7 @@ def test_transcript_attestation_blocker_is_recorded_and_changes_the_plan(tmp_pat
         "Verified: None.\nAssumed: None.\n"
         "Simulated: Per the mock case file, your transcript remains on file as not attested; "
         "certificate, passport, and Emirates ID are present and valid. I searched for an "
-        "alternative attestation route and filed an escalation ticket.\n"
+        "alternative attestation route and filed a ticket for a human reviewer.\n"
         "What you told me: You said you cannot get your transcript attested through the normal "
         "process.\n"
         "Next step: A human reviewer will follow up on alternative attestation options or "

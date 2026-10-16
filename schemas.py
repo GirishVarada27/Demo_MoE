@@ -140,6 +140,13 @@ class RecordUserFactResult(BaseModel):
     error: str | None = None
 
 
+class RecordChunkRelevanceResult(BaseModel):
+    chunk_id: str | None = None
+    decision: Literal["applies", "does_not_apply", "partially_applies"] | None = None
+    reason: str | None = None
+    error: str | None = None
+
+
 class UserReportedFact(BaseModel):
     """A fact the applicant stated in conversation, as opposed to one derived
     from a tool result -- kept in its own dict (CaseState.user_reported_facts)
@@ -148,6 +155,17 @@ class UserReportedFact(BaseModel):
     value: str
     label: Literal["user_reported"] = "user_reported"
     recorded_at: datetime
+
+
+class ChunkRelevanceNote(BaseModel):
+    """The agent's own read on whether a knowledge chunk search_requirements
+    surfaced actually applies to the case at hand -- recorded structurally
+    (via the record_chunk_relevance tool) rather than left as a prose open
+    question, so it can be checked/reused instead of re-litigated."""
+
+    chunk_id: str
+    decision: Literal["applies", "does_not_apply", "partially_applies"]
+    reason: str
 
 
 class CaseState(BaseModel):
@@ -166,3 +184,6 @@ class CaseState(BaseModel):
     open_questions: list[str] = []
     assumptions: list[str] = []
     tool_history: list[ToolCallTrace] = []
+    retrieved_chunks: dict[str, RuleChunk] = {}
+    chunk_relevance: dict[str, ChunkRelevanceNote] = {}
+    escalation: EscalationTicket | None = None

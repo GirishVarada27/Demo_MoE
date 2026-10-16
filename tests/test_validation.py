@@ -76,7 +76,7 @@ def test_requirement_claims_grounded_fails_without_any_tool_history():
 
 
 def test_requirement_claims_grounded_passes_with_official_search_result():
-    draft = "Verified: Attestation is required for foreign certificates.\nAssumed: None.\nSimulated: None.\nNext step: none."
+    draft = "Verified: Attestation is required for foreign certificates, per attest-001.\nAssumed: None.\nSimulated: None.\nNext step: none."
     case_state = CaseState(tool_history=[_trace("search_requirements", "2 result(s), top=attest-001 [OFFICIAL] (score=0.9)")])
     assert check_requirement_claims_grounded(draft, case_state) == []
 
@@ -96,6 +96,27 @@ def test_requirement_claims_grounded_rejects_check_documents_alone():
     case_state = CaseState(tool_history=[_trace("check_documents", "present=[], missing=['transcript'], invalid=[]")])
     failures = check_requirement_claims_grounded(draft, case_state)
     assert failures
+    assert "Simulated" in failures[0]
+
+
+def test_requirement_claims_grounded_rejects_verified_statement_citing_a_tool_result():
+    """Point 3 (testing APP-006): citing check_documents/evaluate_eligibility/
+    get_applicant_record directly under Verified is rejected outright, even
+    if an OFFICIAL chunk also happens to be in the session's tool history --
+    a tool/mock result never grounds a Verified claim, period."""
+    draft = (
+        "Verified: Per check_documents, your transcript and certificate are attested and valid.\n"
+        "Assumed: None.\nSimulated: None.\nNext step: none."
+    )
+    case_state = CaseState(
+        tool_history=[
+            _trace("search_requirements", "2 result(s), top=attest-001 [OFFICIAL] (score=0.9)"),
+            _trace("check_documents", "present=['grade_12_certificate', 'transcript'], missing=[], invalid=[]"),
+        ]
+    )
+    failures = check_requirement_claims_grounded(draft, case_state)
+    assert failures
+    assert "tool/mock result" in failures[0]
     assert "Simulated" in failures[0]
 
 

@@ -28,9 +28,13 @@ def test_documents_question_uses_search_requirements_only(monkeypatch):
     monkeypatch.setattr("tools.search_rules._embed", lambda texts: [[1.0] for _ in texts])
     case_state = CaseState()
     draft = (
-        "Verified: You'll need your original grade 10-12 certificates, an Emirates ID copy, and a "
-        "passport copy; foreign-language certificates also need a certified translation.\n"
-        "Assumed: None.\nSimulated: None.\n"
+        "Verified: Certificates issued abroad must be attested before or as part of equivalency "
+        "processing, per attest-001.\n"
+        "Assumed: Based on commonly required supporting documents (not confirmed as an exhaustive "
+        "official list this session), you'll likely also need your grade 10-12 certificates, an "
+        "Emirates ID copy, and a passport copy; foreign-language certificates typically need a "
+        "certified translation.\n"
+        "Simulated: None.\n"
         "Next step: Gather these documents, then share your applicant id so I can check your file."
     )
     create_fn = dispatching_create(
@@ -130,8 +134,8 @@ def test_cannot_get_attestation_triggers_revalidation_and_changed_plan(tmp_path,
     turn2_draft = (
         "Verified: None.\nAssumed: None.\n"
         "Simulated: Attestation cannot be obtained through the normal process, so standard document "
-        "verification cannot proceed for this requirement; an escalation ticket was filed in the "
-        "mock case-management queue.\n"
+        "verification cannot proceed for this requirement; a ticket was filed in the mock "
+        "case-management queue for a human reviewer.\n"
         "Next step: A human reviewer will follow up about alternative ways to verify your transcript."
     )
     create_fn_2 = dispatching_create(
@@ -216,8 +220,8 @@ def test_tool_failure_is_handled_gracefully_and_escalated(tmp_path, monkeypatch)
     case_state = CaseState()
     draft = (
         "Verified: None.\nAssumed: None.\n"
-        "Simulated: An escalation ticket was filed in the mock case-management queue after the "
-        "applicant lookup failed twice.\n"
+        "Simulated: The applicant lookup failed twice, so a ticket was filed in the mock "
+        "case-management queue for a human reviewer.\n"
         "Next step: A human reviewer will follow up and complete this lookup manually."
     )
     create_fn = dispatching_create(

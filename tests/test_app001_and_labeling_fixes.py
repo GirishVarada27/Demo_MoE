@@ -149,9 +149,13 @@ def test_documents_question_still_calls_only_search_requirements(monkeypatch):
     monkeypatch.setattr("tools.search_rules._embed", lambda texts: [[1.0] for _ in texts])
     case_state = CaseState()
     draft = (
-        "Verified: You'll need your original grade 10-12 certificates, an Emirates ID copy, and a "
-        "passport copy; foreign-language certificates also need a certified translation.\n"
-        "Assumed: None.\nSimulated: None.\n"
+        "Verified: Certificates issued abroad must be attested before or as part of equivalency "
+        "processing, per attest-001.\n"
+        "Assumed: Based on commonly required supporting documents (not confirmed as an exhaustive "
+        "official list this session), you'll likely also need your grade 10-12 certificates, an "
+        "Emirates ID copy, and a passport copy; foreign-language certificates typically need a "
+        "certified translation.\n"
+        "Simulated: None.\n"
         "Next step: Let me know if you'd like me to check these against a specific case."
     )
     create_fn = dispatching_create(

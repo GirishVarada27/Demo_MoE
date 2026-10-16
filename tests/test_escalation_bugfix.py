@@ -82,10 +82,11 @@ def test_app009_complete_file_with_undetermined_threshold_does_not_force_escalat
     honest answer now validates cleanly on the first try."""
     case_state = CaseState()
     draft = (
-        "Verified: Your submitted documents (certificate, transcript, passport, Emirates ID) are "
-        "all present and have passed attestation, expiry, and curriculum checks.\n"
+        "Verified: None.\n"
         "Assumed: None.\n"
-        "Simulated: Applicant and document records were looked up from the mock case file.\n"
+        "Simulated: Per the mock case file, your submitted documents (certificate, transcript, "
+        "passport, Emirates ID) are all present and have passed attestation, expiry, and "
+        "curriculum checks.\n"
         "Next step: The official British-curriculum grade threshold isn't published, so a binding "
         "determination needs manual confirmation -- let me know if you'd like this escalated to a "
         "human reviewer for that."
@@ -146,9 +147,13 @@ def test_documents_question_naming_an_applicant_still_calls_search_only(monkeypa
     monkeypatch.setattr("tools.search_rules._embed", lambda texts: [[1.0] for _ in texts])
     case_state = CaseState()
     draft = (
-        "Verified: You'll need your original grade 10-12 certificates, an Emirates ID copy, and a "
-        "passport copy; foreign-language certificates also need a certified translation.\n"
-        "Assumed: None.\nSimulated: None.\n"
+        "Verified: Certificates issued abroad must be attested before or as part of equivalency "
+        "processing, per attest-001.\n"
+        "Assumed: Based on commonly required supporting documents (not confirmed as an exhaustive "
+        "official list this session), you'll likely also need your grade 10-12 certificates, an "
+        "Emirates ID copy, and a passport copy; foreign-language certificates typically need a "
+        "certified translation.\n"
+        "Simulated: None.\n"
         "Next step: Let me know if you'd like me to check these against your file, APP-009."
     )
     create_fn = dispatching_create(
