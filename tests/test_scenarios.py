@@ -21,6 +21,17 @@ def _tool_names(case_state: CaseState, start: int = 0) -> list[str]:
     return [entry.tool for entry in case_state.tool_history[start:]]
 
 
+def _evaluate_eligibility_response(call_id: str, applicant_id: str, curriculum: str) -> FakeResponse:
+    """A case turn's draft is only validated after evaluate_eligibility has run this turn."""
+    return FakeResponse(
+        FakeMessage(
+            tool_calls=[
+                FakeToolCall(call_id, "evaluate_eligibility", {"case_state": {"applicant_id": applicant_id, "curriculum": curriculum}})
+            ]
+        )
+    )
+
+
 # --- "What documents do I need?" -> search_requirements only -----------------
 
 
@@ -80,6 +91,7 @@ def test_missing_anything_question_looks_up_applicant_then_checks_documents():
                     ]
                 )
             ),
+            _evaluate_eligibility_response("c3", "APP-002", "British (GCE)"),
             FakeResponse(FakeMessage(content=draft)),
         ]
     )
@@ -88,7 +100,8 @@ def test_missing_anything_question_looks_up_applicant_then_checks_documents():
         case_state, [], "Am I missing anything? My applicant id is APP-002.", client=object(), model="fake-model", create_fn=create_fn
     )
 
-    assert _tool_names(case_state) == ["get_applicant_record", "check_documents"]
+    assert _tool_names(case_state) == ["get_applicant_record", "check_documents", "evaluate_eligibility"]
+    assert result == draft
     # The reported gap comes from the real tool result, not the fixture prose.
     assert case_state.documents is not None
     assert any(doc.doc_type == "transcript" for doc in case_state.documents.invalid)
@@ -192,6 +205,7 @@ def test_contradictory_curriculum_is_detected_and_flagged_as_open_question():
                 )
             ),
             FakeResponse(FakeMessage(tool_calls=[FakeToolCall("c2", "get_applicant_record", {"applicant_id": "APP-005"})])),
+            _evaluate_eligibility_response("c3", "APP-005", "American (US High School Diploma)"),
             FakeResponse(FakeMessage(content=draft)),
         ]
     )
@@ -209,7 +223,7 @@ def test_contradictory_curriculum_is_detected_and_flagged_as_open_question():
     # what the user stated, surfaced as an open question rather than silently resolved.
     assert case_state.curriculum == "American (US High School Diploma)"  # not silently overwritten
     assert any("differs from the curriculum currently being evaluated" in q for q in case_state.open_questions)
-    assert check_required_sections(result) == []
+    assert result == draft
 
 
 # --- tool failure -> graceful handling + escalation --------------------------

@@ -30,6 +30,10 @@ escalates (CLAUDE.md rules 2 and 3). Two passes:
      (an open ticket from a prior trigger this session), any mention of
      escalation in the draft must cite that ticket id, not read as a
      proposal to escalate again or file a new one.
+   - check_missing_documents_requested: if check_documents found a required
+     document missing (and the applicant hasn't said they can't get it),
+     the draft must name it, say it blocks the application, and ask the
+     applicant to supply it.
    If any rule-based check fails, the (costly) LLM verifier pass is
    skipped entirely -- there's no point double-checking a draft already
    known to be unsupported.
@@ -239,6 +243,58 @@ def check_existing_escalation_referenced(draft: str, case_state: CaseState) -> l
     ]
 
 
+UNAVAILABLE_FACT_VALUES = {"unavailable", "no", "not available", "cannot obtain", "can't obtain", "none"}
+
+_BLOCKING_PATTERN = re.compile(
+    r"\b(block\w*|on hold|required before|(?:cannot|can't|can ?not) (?:be )?(?:proceed|processed|continue|move forward))\b",
+    re.IGNORECASE,
+)
+_SUPPLY_REQUEST_PATTERN = re.compile(
+    r"\b(please|could you|can you|kindly)\b.*?\b(provide|upload|submit|supply|send|share|attach)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _doc_label(doc_type: str) -> str:
+    """'emirates_id_copy' -> 'emirates id', the way a person would name it."""
+    return doc_type.removesuffix("_copy").replace("_", " ")
+
+
+def supplyable_missing_documents(case_state: CaseState) -> list[str]:
+    """Doc types check_documents found missing, minus any the applicant has
+    reported they can't obtain (e.g. user_reported_facts {"emirates_id":
+    "unavailable"}) -- those are a different problem, not something to ask
+    them to upload."""
+    if case_state.documents is None:
+        return []
+    unavailable_keys = [
+        key for key, fact in case_state.user_reported_facts.items() if fact.value.strip().lower() in UNAVAILABLE_FACT_VALUES
+    ]
+    return [
+        d
+        for d in case_state.documents.missing
+        if not any(_doc_label(d).replace(" ", "_") in key for key in unavailable_keys)
+    ]
+
+
+def check_missing_documents_requested(draft: str, case_state: CaseState) -> list[str]:
+    """A missing document the applicant can supply is a blocking request to
+    them, not a reason to escalate or to answer around it."""
+    missing = supplyable_missing_documents(case_state)
+    if not missing:
+        return []
+    lowered = draft.lower()
+    failures = []
+    unnamed = [d for d in missing if _doc_label(d) not in lowered and d not in lowered]
+    if unnamed:
+        failures.append(f"Missing document(s) not named in the draft: {', '.join(unnamed)} -- name each one explicitly.")
+    if not _BLOCKING_PATTERN.search(draft):
+        failures.append("The draft doesn't state that the missing document(s) block the application.")
+    if not _SUPPLY_REQUEST_PATTERN.search(draft):
+        failures.append("The draft doesn't ask the applicant to supply the missing document(s) (e.g. 'please upload ...').")
+    return failures
+
+
 def llm_verify(draft: str, case_state: CaseState, create: Callable[..., Any], model: str) -> list[str]:
     tool_outputs = "\n".join(f"- {entry.tool}({entry.args}) -> {entry.result_summary}" for entry in case_state.tool_history)
     messages = [
@@ -274,6 +330,7 @@ def validate_draft(
     failures += check_eligibility_statements_grounded(draft, case_state)
     failures += check_draft_application_caveated(draft, case_state)
     failures += check_existing_escalation_referenced(draft, case_state)
+    failures += check_missing_documents_requested(draft, case_state)
     if failures:
         return ValidationResult(passed=False, failures=failures)
 

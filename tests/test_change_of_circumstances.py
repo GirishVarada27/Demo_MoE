@@ -178,7 +178,14 @@ def test_record_user_fact_conflicting_with_tool_reported_fact_is_flagged():
         ]
     )
 
-    run_turn(case_state, [], "Look up APP-002", client=object(), model="fake-model", create_fn=create_fn)
+    run_turn(
+        case_state,
+        [],
+        "Look up APP-002. I actually studied the American curriculum, not British.",
+        client=object(),
+        model="fake-model",
+        create_fn=create_fn,
+    )
 
     assert case_state.facts["stated_curriculum_on_file"] == "British (GCE)"  # tool-reported fact, untouched
     assert case_state.user_reported_facts["stated_curriculum_on_file"].value == "American (US High School Diploma)"

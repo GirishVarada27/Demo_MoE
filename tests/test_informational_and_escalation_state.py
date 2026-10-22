@@ -56,6 +56,7 @@ def test_documents_question_never_creates_a_ticket_even_when_validation_keeps_fa
             ),
             FakeResponse(FakeMessage(content=bad_draft)),
             FakeResponse(FakeMessage(content=bad_draft)),
+            FakeResponse(FakeMessage(content=bad_draft)),
         ]
     )
 

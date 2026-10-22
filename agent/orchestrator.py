@@ -6,8 +6,9 @@ the model decide whether and which tool(s) to call (CLAUDE.md rule 1 --
 the agent decides, the tools execute); dispatches any requested tool
 calls against real tool functions; folds each typed result back into the
 session's CaseState; logs every tool call as a ToolCallTrace; and loops
-until the model returns a final answer or MAX_ITERATIONS is reached, at
-which point it escalates rather than let the model guess.
+until the model returns a validated final answer or the turn's tool-call
+budget (MAX_TOOL_CALLS successful calls) runs out, at which point it
+escalates rather than let the model guess.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from typing import Any, Callable
 
 import config
 from agent.prompts import SYSTEM_PROMPT
-from agent.validation import validate_draft
+from agent.validation import UNAVAILABLE_FACT_VALUES, supplyable_missing_documents, validate_draft
 from schemas import (
     CaseState,
     CheckDocumentsResult,
@@ -38,9 +39,16 @@ from tools.document_check import ATTESTATION_REQUIRED_DOC_TYPES
 from tools.escalation import append_to_ticket, escalate_to_human
 from tools.search_rules import search_requirements
 
-MAX_ITERATIONS = 6
+# Per-turn budget of SUCCESSFUL non-validation tool calls. Duplicates, declined
+# or rejected calls, failed calls, and draft validations don't count toward it.
+MAX_TOOL_CALLS = 12
+# A draft that fails validation gets at most this many rewrites before escalating.
+MAX_REWRITES = 2
+# Hard backstop on model round-trips per turn, so a model that keeps getting
+# ordering errors or rejected calls (none of which spend MAX_TOOL_CALLS) can't loop forever.
+_MAX_MODEL_CALLS = MAX_TOOL_CALLS + MAX_REWRITES + 8
 _CHAT_API_VERSION = "2024-02-01"
-_UNAVAILABLE_FACT_VALUES = {"unavailable", "no", "not available", "cannot obtain", "can't obtain", "none"}
+_UNAVAILABLE_FACT_VALUES = UNAVAILABLE_FACT_VALUES
 _NO_RULE_SENTINEL_CHUNK_ID = "NONE"
 # Tools whose mere invocation means this turn is about a specific applicant's
 # case, not a generic policy question -- drives _is_informational_turn.
@@ -54,6 +62,106 @@ _APPLICANT_SPECIFIC_TOOLS = {
     "create_draft_application",
     "escalate_to_human",
 }
+# Calling any of these this turn makes it a case turn, where a draft may only
+# go to validation once evaluate_eligibility has also run this turn.
+_CASE_LOOKUP_TOOLS = {"get_applicant_record", "check_documents", "create_draft_application"}
+
+_APPLICANT_ID_CLAUSE = re.compile(
+    r"\b(?:(?:my|the)\s+)?(?:applicant\s+)?(?:id|number)\s*(?:is|=|:)?\s*[A-Z]{2,}-\d+\b"
+    r"|\b(?:i\s+am|i'm|this\s+is)\s+[A-Z]{2,}-\d+\b"
+    r"|\b[A-Z]{2,}-\d+\b",
+    re.IGNORECASE,
+)
+_LEADING_GREETING = re.compile(r"^\W*(?:hi|hello|hey|good (?:morning|afternoon|evening)|thanks|thank you)\b[\s,!.]*", re.IGNORECASE)
+_NON_STATEMENT_START = re.compile(
+    r"^\W*(?:can|could|would|will|please|what|how|why|when|where|which|who|am|do|does|did|is|are|should|"
+    r"tell|check|show|help|look)\b",
+    re.IGNORECASE,
+)
+_FIRST_PERSON_PATTERN = re.compile(r"\b(?:i|i'm|i've|i'd|i'll|my|me|mine|we|we're|our)\b", re.IGNORECASE)
+_HUMAN_REQUEST_PATTERN = re.compile(r"\b(human|real person|someone|staff|officer|reviewer|escalat\w*)\b", re.IGNORECASE)
+
+_STEP_LABELS = {
+    "search_requirements": "searching the published rules",
+    "get_applicant_record": "looking up your applicant record",
+    "check_documents": "checking your documents",
+    "evaluate_eligibility": "evaluating eligibility",
+    "create_draft_application": "creating a draft application",
+    "record_user_fact": "recording something you told me",
+    "record_chunk_relevance": "reviewing whether a rule applies",
+    "escalate_to_human": "escalating to a human reviewer",
+    "validate_draft": "validating my draft answer",
+}
+
+
+def _first_person_fact_sentences(user_message: str) -> list[str]:
+    """Sentences in the user's message that state something about themselves.
+    Questions, requests, greetings, and bare applicant-id statements ("My
+    applicant ID is APP-003") don't count -- an id is a lookup key, not a
+    fact about the applicant's circumstances."""
+    found = []
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", user_message):
+        sentence = sentence.strip()
+        if not sentence or sentence.endswith("?"):
+            continue
+        remainder = _LEADING_GREETING.sub("", _APPLICANT_ID_CLAUSE.sub("", sentence)).strip()
+        if not remainder or _NON_STATEMENT_START.match(remainder):
+            continue
+        if _FIRST_PERSON_PATTERN.search(remainder):
+            found.append(sentence)
+    return found
+
+
+def _record_user_fact_rejection(case_state: CaseState, user_message: str, raw_args: dict) -> str | None:
+    """Why record_user_fact must not run for this call, or None if it may.
+    Enforced in code, not just the prompt: the model was recording on-file
+    data (and bare applicant ids) as "user-reported" facts, which then fed
+    open_questions and re-checks every turn."""
+    if not _first_person_fact_sentences(user_message):
+        return (
+            "record_user_fact rejected: the user's message contains no new first-person fact "
+            "(a greeting, question, or applicant id is not a fact to record). Do not record anything."
+        )
+    value = str(raw_args.get("fact_value", "")).strip().lower()
+    known = {v.strip().lower() for v in case_state.facts.values()}
+    known |= {f.value.strip().lower() for f in case_state.user_reported_facts.values()}
+    if value and value in known:
+        return f"record_user_fact rejected: '{raw_args.get('fact_value')}' is already on file, not a new fact."
+    return None
+
+
+def _needs_eligibility_before_validation(case_state: CaseState, turn_start_index: int) -> bool:
+    """In a case turn, a draft can't go to validate_draft until
+    evaluate_eligibility has run this turn. Doesn't apply when no applicant
+    is resolved (nothing to evaluate) or the case was already handed to a
+    human this turn (e.g. a tool failed twice)."""
+    turn = case_state.tool_history[turn_start_index:]
+    tools = {t.tool for t in turn}
+    if case_state.applicant_id is None or not (tools & _CASE_LOOKUP_TOOLS):
+        return False
+    if any(t.tool == "escalate_to_human" and "queued" in t.result_summary for t in turn):
+        return False
+    return "evaluate_eligibility" not in tools
+
+
+def _limit_reached_message(last_tool: str | None, last_failures: list[str], ticket_id: str, tool_limit_hit: bool) -> str:
+    """last_tool is the last step logged this turn before the limit was hit
+    (None if nothing ran). tool_limit_hit is False when the model round-trip
+    backstop ran out instead of the MAX_TOOL_CALLS budget."""
+    limit = f"limit of {MAX_TOOL_CALLS} tool calls" if tool_limit_hit else f"limit of {_MAX_MODEL_CALLS} model steps"
+    if last_tool:
+        step = f"{_STEP_LABELS.get(last_tool, last_tool)} ({last_tool})"
+    else:
+        step = "planning, before any tool had run"
+    if last_failures:
+        claim = f"the last claim that failed validation was: {last_failures[0].rstrip('. ')}"
+    else:
+        claim = "no draft answer had failed validation yet, so no specific claim failed"
+    return (
+        f"I reached this turn's {limit} before I could give you a validated "
+        f"answer. The last step I reached was {step}, and {claim}. I've escalated this case to a human "
+        f"reviewer (SIMULATED ticket {ticket_id})."
+    )
 
 
 def _unavailable_attested_doc_types(case_state: CaseState) -> list[str]:
@@ -224,6 +332,7 @@ _SECTION_FAILURE_PHRASES: list[tuple[str, str]] = [
     ("official knowledge chunk", "a claim in my draft wasn't backed by an official rule I'd actually confirmed this session"),
     ("eligibility", "an eligibility statement in my draft wasn't backed by a completed eligibility check"),
     ("draft application", "a draft application wasn't clearly marked as provisional"),
+    ("missing document", "my draft didn't clearly ask you for a document that's missing from your file"),
 ]
 
 
@@ -557,11 +666,19 @@ def run_turn(
         {"role": "user", "content": user_message},
     ]
     turn_messages: list[dict] = [{"role": "user", "content": user_message}]
-    revision_attempted = False
+    validation_failure_count = 0
+    last_failures: list[str] = []
+    tool_calls_used = 0  # successful non-validation tool calls this turn, against MAX_TOOL_CALLS
+    limit_hit = False
     turn_start_index = len(case_state.tool_history)
     seen_calls: dict[tuple[str, str], str] = {}  # (tool, canonical args) -> result JSON already returned this turn
 
-    for _ in range(MAX_ITERATIONS):
+    def _reply_to_tool_call(tc: Any, content: str) -> None:
+        tool_msg = {"role": "tool", "tool_call_id": tc.id, "content": content}
+        messages.append(tool_msg)
+        turn_messages.append(tool_msg)
+
+    for _ in range(_MAX_MODEL_CALLS):
         response, call_error = _call_model_with_retry(create, model, messages)
         if response is None:
             escalation, reused = _escalate_once(
@@ -588,6 +705,22 @@ def run_turn(
 
         if not message.tool_calls:
             draft = message.content or ""
+
+            if _needs_eligibility_before_validation(case_state, turn_start_index):
+                # Ordering error, not a validation failure: doesn't spend a rewrite.
+                ordering_error = (
+                    "validate_draft rejected: evaluate_eligibility has not run this turn. Call "
+                    f"evaluate_eligibility for applicant {case_state.applicant_id} (curriculum "
+                    f"'{case_state.curriculum}') first, then submit your answer again. This is an ordering "
+                    "error, not a validation failure."
+                )
+                _log_tool_call(case_state, "validate_draft", {"ordering_error": True}, f"rejected (ordering): {ordering_error}")
+                messages.append({"role": "assistant", "content": draft})
+                turn_messages.append({"role": "assistant", "content": draft})
+                messages.append({"role": "user", "content": ordering_error})
+                turn_messages.append({"role": "user", "content": ordering_error})
+                continue
+
             draft = _ensure_user_reported_facts_section(case_state, draft)
             validation = validate_draft(draft, case_state, create=create, model=model)
 
@@ -597,10 +730,11 @@ def run_turn(
                 return draft
 
             informational = _is_informational_turn(case_state, turn_start_index)
+            validation_failure_count += 1
+            last_failures = validation.failures
+            _log_validation_failure(case_state, attempt=validation_failure_count, draft=draft, failures=validation.failures)
 
-            if not revision_attempted:
-                revision_attempted = True
-                _log_validation_failure(case_state, attempt=1, draft=draft, failures=validation.failures)
+            if validation_failure_count <= MAX_REWRITES:
                 messages.append({"role": "assistant", "content": draft})
                 turn_messages.append({"role": "assistant", "content": draft})
                 if informational:
@@ -621,11 +755,11 @@ def run_turn(
                         "sections (Verified, Assumed, Simulated, Next step), and make sure every "
                         "eligibility/status statement follows a successful evaluate_eligibility call."
                     )
+                rewrites_left = MAX_REWRITES - validation_failure_count
+                revision_request += f"\n(Rewrite {validation_failure_count} of {MAX_REWRITES}; {rewrites_left} left after this.)"
                 messages.append({"role": "user", "content": revision_request})
                 turn_messages.append({"role": "user", "content": revision_request})
                 continue
-
-            _log_validation_failure(case_state, attempt=2, draft=draft, failures=validation.failures)
 
             if informational:
                 # A generic policy question has no applicant case to escalate -- never file a
@@ -638,7 +772,7 @@ def run_turn(
             escalation, reused = _escalate_once(
                 case_state,
                 reason=(
-                    "Draft answer failed validation twice: "
+                    f"Draft answer failed validation after {MAX_REWRITES} rewrites: "
                     + "; ".join(validation.failures)
                     + f" | final draft: {draft}"
                 ),
@@ -647,7 +781,7 @@ def run_turn(
             _log_tool_call(
                 case_state,
                 "escalate_to_human",
-                {"reason": "validation_failed_twice"},
+                {"reason": "validation_failed_after_rewrites"},
                 _summarize_result("escalate_to_human", escalation) + (" (appended to existing ticket)" if reused else ""),
             )
             ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
@@ -687,6 +821,45 @@ def run_turn(
 
             call_key = (name, json.dumps(raw_args, sort_keys=True))
 
+            if tool_calls_used >= MAX_TOOL_CALLS:
+                # Every tool_call id still needs a reply, or the saved conversation is invalid next turn.
+                limit_hit = True
+                _reply_to_tool_call(tc, json.dumps({"error": f"Not executed: per-turn limit of {MAX_TOOL_CALLS} tool calls reached."}))
+                continue
+
+            if name == "record_user_fact":
+                rejection = _record_user_fact_rejection(case_state, user_message, raw_args)
+                if rejection is not None:
+                    _log_tool_call(case_state, name, raw_args, f"rejected: {rejection}")
+                    result_json = json.dumps({"error": rejection})
+                    seen_calls[call_key] = result_json
+                    _reply_to_tool_call(tc, result_json)
+                    continue
+
+            if (
+                name == "escalate_to_human"
+                and supplyable_missing_documents(case_state)
+                and not case_state.facts.get("no_rule_found_reason")
+                and not _HUMAN_REQUEST_PATTERN.search(user_message)
+            ):
+                # A missing document the applicant can supply is a request to them, not a case
+                # for a human reviewer.
+                missing = ", ".join(supplyable_missing_documents(case_state))
+                result_json = json.dumps(
+                    {
+                        "declined": True,
+                        "reason": (
+                            f"Not escalated: the applicant can supply the missing document(s) ({missing}). "
+                            "Name each one, state that it blocks the application, and ask the applicant "
+                            "to supply it."
+                        ),
+                    }
+                )
+                _log_tool_call(case_state, name, raw_args, f"declined: missing document(s) the applicant can supply ({missing})")
+                seen_calls[call_key] = result_json
+                _reply_to_tool_call(tc, result_json)
+                continue
+
             if (
                 name == "escalate_to_human"
                 and case_state.escalation is None
@@ -722,6 +895,7 @@ def run_turn(
                 )
                 if append_result.ticket:
                     case_state.escalation = append_result.ticket
+                    tool_calls_used += 1
                 result_json = append_result.model_dump_json()
                 _log_tool_call(
                     case_state,
@@ -744,6 +918,7 @@ def run_turn(
                 result, succeeded = _execute_tool_with_retry(case_state, name, raw_args)
 
                 if succeeded:
+                    tool_calls_used += 1
                     result_json = result.model_dump_json()
                     if name == "evaluate_eligibility":
                         no_rule_answer = _handle_no_rule_found(case_state, result)
@@ -777,22 +952,27 @@ def run_turn(
             messages.append(tool_msg)
             turn_messages.append(tool_msg)
 
+        if limit_hit:
+            break
+
+    turn_steps = case_state.tool_history[turn_start_index:]
+    last_tool = turn_steps[-1].tool if turn_steps else None
     escalation, reused = _escalate_once(
         case_state,
-        reason="Agent reached the maximum tool-call iterations without producing a validated answer.",
+        reason=(
+            f"Agent reached the per-turn tool-call limit ({MAX_TOOL_CALLS}) without a validated answer. "
+            f"Last step: {last_tool or 'none'}. Last failed claim: {last_failures[0] if last_failures else 'none'}"
+        ),
         case_summary=case_state.model_dump_json(),
     )
     _log_tool_call(
         case_state,
         "escalate_to_human",
-        {"reason": "max_iterations_reached"},
+        {"reason": "tool_call_limit_reached"},
         _summarize_result("escalate_to_human", escalation) + (" (appended to existing ticket)" if reused else ""),
     )
     ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
-    fallback = (
-        "I wasn't able to reach a validated answer within this session's tool-call limit, so "
-        f"I've escalated this case to a human reviewer (SIMULATED ticket {ticket_id})."
-    )
+    fallback = _limit_reached_message(last_tool, last_failures, ticket_id, tool_limit_hit=limit_hit)
     turn_messages.append({"role": "assistant", "content": fallback})
     conversation.extend(turn_messages)
     return fallback

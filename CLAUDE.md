@@ -23,7 +23,7 @@ base provenance and unverified gaps: `docs/assumptions.md`.
 pip install -r requirements.txt
 cp .env.example .env   # then fill in credentials -- see Environment below
 
-# Run the full test suite (84 tests, no API credentials needed --
+# Run the full test suite (118 tests, no API credentials needed --
 # every test injects a fake model client, never calls a real API)
 pytest
 
@@ -62,9 +62,19 @@ all seven tool schemas, dispatch whatever tools it chooses (never a
 hardcoded sequence, and never the same exact tool+args call twice in one
 turn -- a repeat is detected and the cached result reused instead of
 re-invoking), fold each typed result back into `CaseState`, and repeat
-until the model returns a final answer or `MAX_ITERATIONS` (6) is hit. A
+until the model returns a final answer or `MAX_TOOL_CALLS` (12) is spent.
+Only *successful* non-validation tool calls count toward that budget;
+duplicates, declined/rejected calls, and validations don't. A
 draft answer is *never* returned directly — it always passes through
-`agent/validation.py::validate_draft()` first.
+`agent/validation.py::validate_draft()` first, and in a case turn (one
+that called `get_applicant_record`/`check_documents`/
+`create_draft_application`) only after `evaluate_eligibility` has run
+*this turn*. An earlier draft gets an ordering error back, which doesn't
+count as a validation failure. `record_user_fact` is rejected in code
+unless the user's message states a new first-person fact. An applicant
+id, a greeting, or a value already on file never qualifies. When the
+budget runs out, the reply names the last step reached and the last
+claim that failed.
 
 **The seven tools** (`tools/`, registered in `tools/__init__.py`'s
 `TOOL_SCHEMAS`/`TOOL_FUNCTIONS` — add both when adding a new tool):
@@ -104,13 +114,18 @@ session*; an eligibility/status statement needs a successful
 verifier pass is skipped entirely (no point double-checking a draft
 already known to be unsupported). Only if all rule-based checks pass does
 a second, independent model call (`llm_verify`) check the draft against
-the actual tool outputs. Fail once → the model gets the specific failure
-reasons and one chance to revise. Fail twice → forced `escalate_to_human`.
+the actual tool outputs. A failed draft gets the specific failure reasons
+and up to `MAX_REWRITES` (2) rewrites. If it still fails, the
+orchestrator forces `escalate_to_human`. If `check_documents` found a
+document missing that the applicant can supply, the draft must name it,
+say it blocks the application, and ask for it. The model's own
+`escalate_to_human` call is declined in that case, unless the user asked
+for a human.
 
-**Retry-then-escalate is the house style**, applied uniformly to: tool
-calls (`_execute_tool_with_retry`), the main chat-completion call
-(`_call_model_with_retry`), and validation failures — always retry/revise
-exactly once, then escalate. `escalate_to_human` and
+**Retry-then-escalate is the house style**, applied to tool calls
+(`_execute_tool_with_retry`) and the main chat-completion call
+(`_call_model_with_retry`): retry exactly once, then escalate. Validation
+failures are the exception, with two rewrites instead of one. `escalate_to_human` and
 `create_draft_application` deliberately catch their own file-I/O errors
 and return a typed error instead of raising, since `escalate_to_human`
 specifically is the system's own safety net called directly (unwrapped)

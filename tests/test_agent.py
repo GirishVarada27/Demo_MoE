@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tools
-from agent.orchestrator import MAX_ITERATIONS, _build_client, run_turn
+from agent.orchestrator import MAX_TOOL_CALLS, _build_client, run_turn
 from agent.validation import LLM_VERIFIER_SYSTEM_PROMPT
 from config import Settings
 from schemas import CaseState
@@ -14,6 +14,19 @@ from tests._fakes import dispatching_create as _dispatching_create
 from tools.applicant_lookup import get_applicant_record as _real_get_applicant_record
 
 _PASS_SECTIONS = "Verified: None yet.\nAssumed: None.\nSimulated: None.\nNext step: {next_step}"
+
+
+def _evaluate_eligibility_response(call_id: str, applicant_id: str, curriculum: str) -> _FakeResponse:
+    """A case turn's draft is only validated after evaluate_eligibility has run this turn."""
+    return _FakeResponse(
+        _FakeMessage(
+            tool_calls=[
+                _FakeToolCall(
+                    call_id, "evaluate_eligibility", {"case_state": {"applicant_id": applicant_id, "curriculum": curriculum}}
+                )
+            ]
+        )
+    )
 
 
 def test_run_turn_no_tools_needed():
@@ -47,6 +60,7 @@ def test_run_turn_calls_tool_then_answers():
                     tool_calls=[_FakeToolCall("call_1", "get_applicant_record", {"applicant_id": "APP-001"})]
                 )
             ),
+            _evaluate_eligibility_response("call_2", "APP-001", "American (US High School Diploma)"),
             _FakeResponse(_FakeMessage(content=draft)),
         ]
     )
@@ -56,10 +70,9 @@ def test_run_turn_calls_tool_then_answers():
     assert result == draft
     assert case_state.applicant_id == "APP-001"
     assert case_state.facts["name"] == "Daniel Thompson"
-    assert len(case_state.tool_history) == 1
-    assert case_state.tool_history[0].tool == "get_applicant_record"
+    assert [t.tool for t in case_state.tool_history] == ["get_applicant_record", "evaluate_eligibility"]
     assert case_state.tool_history[0].step == 1
-    assert len(conversation) == 4
+    assert len(conversation) == 6
     assert conversation[0] == {"role": "user", "content": "Look up APP-001"}
     assert conversation[-1] == {"role": "assistant", "content": draft}
 
@@ -86,6 +99,7 @@ def test_run_turn_updates_case_state_on_contradictory_curriculum_without_restart
                     ]
                 )
             ),
+            _evaluate_eligibility_response("call_2", "APP-002", "British (GCE)"),
             _FakeResponse(_FakeMessage(content=draft)),
         ]
     )
@@ -98,7 +112,7 @@ def test_run_turn_updates_case_state_on_contradictory_curriculum_without_restart
     # Prior conversation is preserved, not discarded -- this turn's exchange is appended after it.
     assert conversation[0] == {"role": "user", "content": "prior turn"}
     assert conversation[1] == {"role": "assistant", "content": "prior answer"}
-    assert len(conversation) == 6
+    assert len(conversation) == 8
 
 
 def test_run_turn_flags_contradictory_applicant_curriculum_as_open_question():
@@ -113,12 +127,14 @@ def test_run_turn_flags_contradictory_applicant_curriculum_as_open_question():
             _FakeResponse(
                 _FakeMessage(tool_calls=[_FakeToolCall("call_1", "get_applicant_record", {"applicant_id": "APP-001"})])
             ),
+            _evaluate_eligibility_response("call_2", "APP-001", "British (GCE)"),
             _FakeResponse(_FakeMessage(content=draft)),
         ]
     )
 
-    run_turn(case_state, conversation, "Look up APP-001", client=object(), model="fake-model", create_fn=create_fn)
+    result = run_turn(case_state, conversation, "Look up APP-001", client=object(), model="fake-model", create_fn=create_fn)
 
+    assert result == draft
     assert case_state.curriculum == "British (GCE)"  # not silently overwritten
     assert any("differs from the curriculum currently being evaluated" in q for q in case_state.open_questions)
 
@@ -140,7 +156,7 @@ def test_run_turn_injects_case_state_into_context():
     assert any("APP-001" in content for content in system_contents)
 
 
-def test_run_turn_max_iterations_triggers_escalation(tmp_path, monkeypatch):
+def test_run_turn_tool_call_limit_triggers_escalation(tmp_path, monkeypatch):
     monkeypatch.setattr("tools.escalation._QUEUE_PATH", tmp_path / "escalation_queue.json")
     case_state = CaseState()
 
@@ -152,21 +168,46 @@ def test_run_turn_max_iterations_triggers_escalation(tmp_path, monkeypatch):
     result = run_turn(case_state, [], "trigger loop", client=object(), model="fake-model", create_fn=always_requests_escalation)
 
     assert "escalated" in result.lower()
-    assert len(case_state.tool_history) == MAX_ITERATIONS + 1
+    assert len(case_state.tool_history) == MAX_TOOL_CALLS + 1
     assert case_state.tool_history[-1].tool == "escalate_to_human"
-    assert case_state.tool_history[-1].args == {"reason": "max_iterations_reached"}
+    assert case_state.tool_history[-1].args == {"reason": "tool_call_limit_reached"}
+    # The reply names the step reached and the (absent) failed claim.
+    assert "The last step I reached was escalating to a human reviewer (escalate_to_human)" in result
+    assert "no draft answer had failed validation yet" in result
+
+
+def test_run_turn_tool_call_limit_reports_last_failed_claim(tmp_path, monkeypatch):
+    monkeypatch.setattr("tools.escalation._QUEUE_PATH", tmp_path / "escalation_queue.json")
+    monkeypatch.setattr("tools.search_rules._embed", lambda texts: [[1.0] for _ in texts])
+    case_state = CaseState()
+    responses = [_FakeResponse(_FakeMessage(content="An unstructured first draft."))]
+    responses += [
+        _FakeResponse(
+            _FakeMessage(tool_calls=[_FakeToolCall(f"call_{i}", "search_requirements", {"query": f"fee question {i}"})])
+        )
+        for i in range(MAX_TOOL_CALLS + 1)
+    ]
+    create_fn = _dispatching_create(responses)
+
+    result = run_turn(case_state, [], "What's the fee?", client=object(), model="fake-model", create_fn=create_fn)
+
+    succeeded = [t for t in case_state.tool_history if t.tool == "search_requirements"]
+    assert len(succeeded) == MAX_TOOL_CALLS  # the 13th call was refused, not executed
+    assert "searching the published rules (search_requirements)" in result
+    assert "the last claim that failed validation was: Missing required section: 'Verified'" in result
 
 
 # --- validation failure paths ------------------------------------------------
 
 
-def test_run_turn_revises_once_then_escalates_on_persistent_validation_failure(tmp_path, monkeypatch):
+def test_run_turn_rewrites_twice_then_escalates_on_persistent_validation_failure(tmp_path, monkeypatch):
     monkeypatch.setattr("tools.escalation._QUEUE_PATH", tmp_path / "escalation_queue.json")
     case_state = CaseState()
     create_fn = _dispatching_create(
         [
             _FakeResponse(_FakeMessage(content="Sure, here's an answer with no structure at all.")),
             _FakeResponse(_FakeMessage(content="Still no structure here either.")),
+            _FakeResponse(_FakeMessage(content="And a third unstructured draft.")),
         ]
     )
 
@@ -174,12 +215,13 @@ def test_run_turn_revises_once_then_escalates_on_persistent_validation_failure(t
 
     assert "escalated" in result.lower()
     tool_names = [t.tool for t in case_state.tool_history]
-    assert tool_names == ["validate_draft", "validate_draft", "escalate_to_human"]
-    assert case_state.tool_history[-1].args == {"reason": "validation_failed_twice"}
+    assert tool_names == ["validate_draft", "validate_draft", "validate_draft", "escalate_to_human"]
+    assert case_state.tool_history[-1].args == {"reason": "validation_failed_after_rewrites"}
     # The trace captures the exact failure reason and the draft that failed, per attempt.
     assert "Missing required section" in case_state.tool_history[0].result_summary
     assert "Sure, here's an answer with no structure at all." in case_state.tool_history[0].result_summary
     assert "Still no structure here either." in case_state.tool_history[1].result_summary
+    assert "And a third unstructured draft." in case_state.tool_history[2].result_summary
 
 
 def test_run_turn_revision_succeeds_on_second_draft():
@@ -206,7 +248,7 @@ def test_run_turn_llm_verifier_fail_triggers_revision_then_escalation(tmp_path, 
     case_state = CaseState()
     draft = _PASS_SECTIONS.format(next_step="Provide the applicant id.")
     create_fn = _dispatching_create(
-        [_FakeResponse(_FakeMessage(content=draft)), _FakeResponse(_FakeMessage(content=draft))],
+        [_FakeResponse(_FakeMessage(content=draft)) for _ in range(3)],
         verifier_response=_FakeResponse(_FakeMessage(content="FAIL: states a fee not confirmed anywhere")),
     )
 
@@ -214,7 +256,7 @@ def test_run_turn_llm_verifier_fail_triggers_revision_then_escalation(tmp_path, 
 
     assert "escalated" in result.lower()
     assert case_state.tool_history[-1].tool == "escalate_to_human"
-    assert case_state.tool_history[-1].args == {"reason": "validation_failed_twice"}
+    assert case_state.tool_history[-1].args == {"reason": "validation_failed_after_rewrites"}
 
 
 def test_run_turn_eligibility_statement_without_evaluate_eligibility_fails_validation(tmp_path, monkeypatch):
@@ -224,7 +266,7 @@ def test_run_turn_eligibility_statement_without_evaluate_eligibility_fails_valid
         "Verified: None yet.\nAssumed: None.\nSimulated: None.\nNext step: none.\n\n"
         "Based on this, the applicant appears eligible."
     )
-    create_fn = _dispatching_create([_FakeResponse(_FakeMessage(content=draft)), _FakeResponse(_FakeMessage(content=draft))])
+    create_fn = _dispatching_create([_FakeResponse(_FakeMessage(content=draft)) for _ in range(3)])
 
     result = run_turn(case_state, [], "hi", client=object(), model="fake-model", create_fn=create_fn)
 
@@ -309,6 +351,17 @@ def test_run_turn_tool_failure_recovers_on_retry(monkeypatch):
             _FakeResponse(
                 _FakeMessage(tool_calls=[_FakeToolCall("call_1", "get_applicant_record", {"applicant_id": "APP-001"})])
             ),
+            _FakeResponse(
+                _FakeMessage(
+                    tool_calls=[
+                        _FakeToolCall(
+                            "call_2",
+                            "evaluate_eligibility",
+                            {"case_state": {"applicant_id": "APP-001", "curriculum": "American (US High School Diploma)"}},
+                        )
+                    ]
+                )
+            ),
             _FakeResponse(_FakeMessage(content=draft)),
         ]
     )
@@ -316,7 +369,7 @@ def test_run_turn_tool_failure_recovers_on_retry(monkeypatch):
     run_turn(case_state, [], "Look up APP-001", client=object(), model="fake-model", create_fn=create_fn)
 
     tool_names = [t.tool for t in case_state.tool_history]
-    assert tool_names == ["get_applicant_record", "get_applicant_record"]
+    assert tool_names == ["get_applicant_record", "get_applicant_record", "evaluate_eligibility"]
     assert "(retry)" in case_state.tool_history[1].result_summary
     assert case_state.applicant_id == "APP-001"  # the retry succeeded and case_state was updated
 

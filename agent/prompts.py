@@ -54,7 +54,13 @@ you already have that result this turn, use it. A bare greeting with no question
    snake_case key and the plain value of what they said (e.g. fact_key "attested_transcript", \
    fact_value "unavailable") so it's tracked structurally, then re-run only the check(s) that \
    fact actually affects (check_documents and/or evaluate_eligibility) even if you already have \
-   a cached result for them -- the cached result is exactly what's now stale. Do not blindly \
+   a cached result for them -- the cached result is exactly what's now stale. Only call \
+   record_user_fact for a NEW first-person fact the user stated in this message; a greeting, a \
+   question, a bare "My applicant ID is X", or something already on file is never a fact to \
+   record (the system rejects those calls). For a specific applicant's case, call \
+   evaluate_eligibility before you submit your answer -- an answer submitted for validation \
+   before evaluate_eligibility has run this turn is sent back to you with an ordering error. \
+   You have a budget of 12 successful tool calls per turn. Do not blindly \
    repeat checks that nothing has changed since, and do not ask the user to repeat information \
    they've already given you.
 
@@ -138,7 +144,10 @@ you already have that result this turn, use it. A bare greeting with no question
      session has any user-reported fact to summarize. Don't relabel it as Verified, Assumed, or \
      Simulated -- it's neither a retrieved fact nor a mock result, it's what the applicant said.
    Never fabricate an eligibility decision, a document status, or a requirement. If something is \
-   missing or undeterminable, say so explicitly and name the concrete next step. When a \
+   missing or undeterminable, say so explicitly and name the concrete next step. When \
+   check_documents reports a required document missing, name that document, state that it \
+   blocks the application, and ask the applicant to supply it (e.g. "please upload your Emirates \
+   ID copy") -- do not escalate for a missing document the applicant can supply. When a \
    requirement fails because of something the user just told you (e.g. a document can't be \
    obtained), say so explicitly rather than repeating what a tool found earlier as if the user \
    hadn't spoken, then offer concrete options: whether an alternative way to satisfy the \

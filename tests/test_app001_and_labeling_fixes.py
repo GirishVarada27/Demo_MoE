@@ -116,11 +116,12 @@ def test_at_most_one_escalation_ticket_per_case_is_reused(tmp_path, monkeypatch)
     run_turn(case_state, [], "Look up APP-001", client=object(), model="fake-model", create_fn=create_fn_1)
     first_ticket_id = case_state.facts["escalation_ticket_id"]
 
-    # Turn 2: validation fails twice, triggering a second escalation trigger for the same case.
+    # Turn 2: validation fails after both rewrites, triggering a second escalation for the same case.
     create_fn_2 = dispatching_create(
         [
             FakeResponse(FakeMessage(content="no structure here")),
             FakeResponse(FakeMessage(content="still no structure")),
+            FakeResponse(FakeMessage(content="no structure a third time")),
         ]
     )
     run_turn(case_state, [], "hi again", client=object(), model="fake-model", create_fn=create_fn_2)
