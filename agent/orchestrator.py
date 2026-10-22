@@ -20,7 +20,7 @@ from typing import Any, Callable
 
 import config
 from agent.prompts import SYSTEM_PROMPT
-from agent.validation import UNAVAILABLE_FACT_VALUES, supplyable_missing_documents, validate_draft
+from agent.validation import UNAVAILABLE_FACT_VALUES, ClaimFailure, supplyable_missing_documents, validate_draft
 from schemas import (
     CaseState,
     CheckDocumentsResult,
@@ -130,21 +130,48 @@ def _record_user_fact_rejection(case_state: CaseState, user_message: str, raw_ar
     return None
 
 
-def _needs_eligibility_before_validation(case_state: CaseState, turn_start_index: int) -> bool:
-    """In a case turn, a draft can't go to validate_draft until
-    evaluate_eligibility has run this turn. Doesn't apply when no applicant
-    is resolved (nothing to evaluate) or the case was already handed to a
-    human this turn (e.g. a tool failed twice)."""
+_APPLICANT_ID_IN_MESSAGE = re.compile(r"\b[A-Z]{2,}-\d+\b", re.IGNORECASE)
+
+
+def _tools_required_before_validation(case_state: CaseState, turn_start_index: int) -> list[str]:
+    """In a case turn (any applicant-case tool ran this turn), a draft can't
+    go to validate_draft until get_applicant_record and evaluate_eligibility
+    have both run this turn -- even if the applicant was looked up in an
+    earlier turn. Returns whichever are still missing, in call order ([] =
+    the draft may be validated). Merely naming an applicant id doesn't make
+    a generic policy question a case turn. Doesn't apply once the case was
+    handed to a human this turn (e.g. a tool failed twice), and a lookup
+    that found no applicant needs no evaluation."""
     turn = case_state.tool_history[turn_start_index:]
     tools = {t.tool for t in turn}
-    if case_state.applicant_id is None or not (tools & _CASE_LOOKUP_TOOLS):
-        return False
+    if not tools & (_CASE_LOOKUP_TOOLS | {"evaluate_eligibility"}):
+        return []
     if any(t.tool == "escalate_to_human" and "queued" in t.result_summary for t in turn):
-        return False
-    return "evaluate_eligibility" not in tools
+        return []
+    lookups = [t for t in turn if t.tool == "get_applicant_record" and not t.result_summary.startswith(("error:", "rejected", "duplicate"))]
+    if not lookups:
+        return ["get_applicant_record", "evaluate_eligibility"] if "evaluate_eligibility" not in tools else ["get_applicant_record"]
+    if case_state.applicant_id is None or lookups[-1].result_summary == "not found":
+        return []
+    return [] if "evaluate_eligibility" in tools else ["evaluate_eligibility"]
 
 
-def _limit_reached_message(last_tool: str | None, last_failures: list[str], ticket_id: str, tool_limit_hit: bool) -> str:
+def _format_failing_claims(failing_claims: list[ClaimFailure]) -> str:
+    return "\n".join(f'- "{f.claim}" -- {f.reason}' for f in failing_claims)
+
+
+def _failure_detail(validation_failures: list[str], failing_claims: list[ClaimFailure]) -> str:
+    """What to tell the user about a draft that never passed: the exact
+    failing claims when the failure is about claims, else a plain-language
+    reason for a structural failure (e.g. a missing section)."""
+    if failing_claims:
+        return "These claims in my draft couldn't be confirmed:\n" + _format_failing_claims(failing_claims)
+    return f"My draft couldn't be confirmed: {_plain_language_failure_reason(validation_failures)}."
+
+
+def _limit_reached_message(
+    last_tool: str | None, last_failures: list[str], last_failing_claims: list[ClaimFailure], ticket_id: str, tool_limit_hit: bool
+) -> str:
     """last_tool is the last step logged this turn before the limit was hit
     (None if nothing ran). tool_limit_hit is False when the model round-trip
     backstop ran out instead of the MAX_TOOL_CALLS budget."""
@@ -153,13 +180,15 @@ def _limit_reached_message(last_tool: str | None, last_failures: list[str], tick
         step = f"{_STEP_LABELS.get(last_tool, last_tool)} ({last_tool})"
     else:
         step = "planning, before any tool had run"
-    if last_failures:
-        claim = f"the last claim that failed validation was: {last_failures[0].rstrip('. ')}"
+    if last_failing_claims:
+        claim = "the claims that last failed validation were:\n" + _format_failing_claims(last_failing_claims) + "\n"
+    elif last_failures:
+        claim = f"the last check that failed validation was: {last_failures[0].rstrip('. ')}. "
     else:
-        claim = "no draft answer had failed validation yet, so no specific claim failed"
+        claim = "no draft answer had failed validation yet, so no specific claim failed. "
     return (
         f"I reached this turn's {limit} before I could give you a validated "
-        f"answer. The last step I reached was {step}, and {claim}. I've escalated this case to a human "
+        f"answer. The last step I reached was {step}, and {claim}I've escalated this case to a human "
         f"reviewer (SIMULATED ticket {ticket_id})."
     )
 
@@ -361,12 +390,12 @@ def _is_informational_turn(case_state: CaseState, turn_start_index: int) -> bool
     return bool(turn_tools) and not (turn_tools & _APPLICANT_SPECIFIC_TOOLS)
 
 
-def _build_informational_fallback(case_state: CaseState, failures: list[str]) -> str:
+def _build_informational_fallback(case_state: CaseState, failures: list[str], failing_claims: list[ClaimFailure]) -> str:
     """For a generic policy question whose draft still failed validation
-    after one revision: never escalate (there's no applicant case to
+    after its rewrites: never escalate (there's no applicant case to
     escalate), just answer plainly from the chunks actually retrieved this
-    session, say what couldn't be confirmed, and offer -- without creating
-    a ticket -- to escalate if the applicant wants a human to look at it."""
+    session, say exactly what couldn't be confirmed, and offer -- without
+    creating a ticket -- to escalate if the applicant wants a human to look at it."""
     official_chunks = [c for c in case_state.retrieved_chunks.values() if c.label == "OFFICIAL"]
     if official_chunks:
         summary = " ".join(f"{c.text}" for c in official_chunks[:3])
@@ -374,8 +403,8 @@ def _build_informational_fallback(case_state: CaseState, failures: list[str]) ->
     else:
         intro = "I didn't find anything in the official rules directly relevant to your question."
     return (
-        f"{intro} I wasn't able to fully confirm a complete answer from that alone -- "
-        f"{_plain_language_failure_reason(failures)}. Let me know if you'd like me to escalate "
+        f"{intro} I wasn't able to fully confirm a complete answer from that alone. "
+        f"{_failure_detail(failures, failing_claims)}\nLet me know if you'd like me to escalate "
         "this question to a human reviewer for a definitive answer, or if you can tell me more "
         "about your specific situation."
     )
@@ -668,6 +697,7 @@ def run_turn(
     turn_messages: list[dict] = [{"role": "user", "content": user_message}]
     validation_failure_count = 0
     last_failures: list[str] = []
+    last_failing_claims: list[ClaimFailure] = []
     tool_calls_used = 0  # successful non-validation tool calls this turn, against MAX_TOOL_CALLS
     limit_hit = False
     turn_start_index = len(case_state.tool_history)
@@ -706,13 +736,16 @@ def run_turn(
         if not message.tool_calls:
             draft = message.content or ""
 
-            if _needs_eligibility_before_validation(case_state, turn_start_index):
+            required = _tools_required_before_validation(case_state, turn_start_index)
+            if required:
                 # Ordering error, not a validation failure: doesn't spend a rewrite.
+                id_match = _APPLICANT_ID_IN_MESSAGE.search(user_message)
+                applicant = case_state.applicant_id or (id_match.group(0).upper() if id_match else "the applicant")
                 ordering_error = (
-                    "validate_draft rejected: evaluate_eligibility has not run this turn. Call "
-                    f"evaluate_eligibility for applicant {case_state.applicant_id} (curriculum "
-                    f"'{case_state.curriculum}') first, then submit your answer again. This is an ordering "
-                    "error, not a validation failure."
+                    f"validate_draft rejected: {' and '.join(required)} "
+                    f"{'has' if len(required) == 1 else 'have'} not run this turn. Call "
+                    f"{' then '.join(required)} for applicant {applicant} first, then submit your answer "
+                    "again. This is an ordering error, not a validation failure."
                 )
                 _log_tool_call(case_state, "validate_draft", {"ordering_error": True}, f"rejected (ordering): {ordering_error}")
                 messages.append({"role": "assistant", "content": draft})
@@ -732,6 +765,7 @@ def run_turn(
             informational = _is_informational_turn(case_state, turn_start_index)
             validation_failure_count += 1
             last_failures = validation.failures
+            last_failing_claims = validation.failing_claims
             _log_validation_failure(case_state, attempt=validation_failure_count, draft=draft, failures=validation.failures)
 
             if validation_failure_count <= MAX_REWRITES:
@@ -755,6 +789,12 @@ def run_turn(
                         "sections (Verified, Assumed, Simulated, Next step), and make sure every "
                         "eligibility/status statement follows a successful evaluate_eligibility call."
                     )
+                if validation.failing_claims:
+                    revision_request += (
+                        "\nOnly claims under Verified need an OFFICIAL chunk. Move a claim backed only by an "
+                        "ASSUMPTION chunk to Assumed, and an applicant-specific mock-tool finding to Simulated "
+                        "-- claims there pass as-is."
+                    )
                 rewrites_left = MAX_REWRITES - validation_failure_count
                 revision_request += f"\n(Rewrite {validation_failure_count} of {MAX_REWRITES}; {rewrites_left} left after this.)"
                 messages.append({"role": "user", "content": revision_request})
@@ -764,7 +804,7 @@ def run_turn(
             if informational:
                 # A generic policy question has no applicant case to escalate -- never file a
                 # ticket for one; answer from the retrieved chunks and offer escalation in words only.
-                fallback = _build_informational_fallback(case_state, validation.failures)
+                fallback = _build_informational_fallback(case_state, validation.failures, validation.failing_claims)
                 turn_messages.append({"role": "assistant", "content": fallback})
                 conversation.extend(turn_messages)
                 return fallback
@@ -786,8 +826,8 @@ def run_turn(
             )
             ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
             fallback = (
-                "I wasn't able to confirm this answer carefully enough to send it as final -- "
-                f"{_plain_language_failure_reason(validation.failures)}. I've escalated your case to "
+                "I wasn't able to confirm this answer carefully enough to send it as final. "
+                f"{_failure_detail(validation.failures, validation.failing_claims)}\nI've escalated your case to "
                 f"a human reviewer (ticket {ticket_id}) so they can confirm the details directly. "
                 "Let me know if there's anything else you'd like to add in the meantime."
             )
@@ -972,7 +1012,7 @@ def run_turn(
         _summarize_result("escalate_to_human", escalation) + (" (appended to existing ticket)" if reused else ""),
     )
     ticket_id = escalation.ticket.ticket_id if escalation.ticket else "unavailable"
-    fallback = _limit_reached_message(last_tool, last_failures, ticket_id, tool_limit_hit=limit_hit)
+    fallback = _limit_reached_message(last_tool, last_failures, last_failing_claims, ticket_id, tool_limit_hit=limit_hit)
     turn_messages.append({"role": "assistant", "content": fallback})
     conversation.extend(turn_messages)
     return fallback

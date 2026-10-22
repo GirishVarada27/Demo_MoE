@@ -13,13 +13,11 @@ escalates (CLAUDE.md rules 2 and 3). Two passes:
      deterministically from CaseState before validation ever runs, not
      left to the model), so validation never fails a draft just for
      omitting it.
-   - check_requirement_claims_grounded: if the draft's "Verified" section
-     states something non-trivial, an OFFICIAL-labeled knowledge chunk
-     (via search_requirements or evaluate_eligibility) must actually have
-     been retrieved this session -- a mock-data tool result alone
-     (check_documents, or an ASSUMPTION-grounded evaluate_eligibility
-     verdict) does NOT ground a Verified claim; that belongs under
-     Simulated/Assumed instead.
+   - verified_claim_failures: each non-trivial claim in the "Verified"
+     section must cite an OFFICIAL chunk id retrieved this session -- a
+     mock-data tool result belongs under Simulated, an ASSUMPTION-chunk
+     claim under Assumed. Claims already under Assumed/Simulated are never
+     claim-checked and always pass. Each failure carries the exact claim.
    - check_eligibility_statements_grounded: if the draft makes an
      eligibility/status statement anywhere, a successful evaluate_eligibility
      call must exist this session.
@@ -38,9 +36,10 @@ escalates (CLAUDE.md rules 2 and 3). Two passes:
    skipped entirely -- there's no point double-checking a draft already
    known to be unsupported.
 
-2. LLM verifier (only runs if rule-based checks all pass): a second,
-   independent model call that only sees this session's actual tool
-   outputs and the draft, and flags any claim they don't support.
+2. LLM verifier (only runs if rule-based checks all pass and something is
+   presented as Verified): a second, independent model call that sees this
+   session's tool outputs and retrieved chunk texts plus only the Verified
+   claims, and flags the first one they don't support.
 """
 
 from __future__ import annotations
@@ -79,16 +78,29 @@ _ELIGIBILITY_PATTERN = re.compile(
 )
 
 LLM_VERIFIER_SYSTEM_PROMPT = """You are a strict fact-checking verifier, not the assistant. You will be \
-shown the actual tool outputs gathered during this session and a draft answer someone else wrote. Your \
-only job is to check whether the draft states anything -- a fact, requirement, document status, or \
-eligibility outcome -- that is NOT directly supported by the attached tool outputs. Reply with exactly \
-one line: either "PASS" if every claim is supported, or "FAIL: <reason>" naming the first unsupported \
-claim you find. Do not answer the user's question yourself."""
+shown the actual tool outputs and the full text of every knowledge chunk retrieved during this session, \
+and the claims someone else's draft presents as VERIFIED. Your only job is to check whether each claim \
+is directly supported by the cited OFFICIAL chunk text or the tool outputs. Reply with exactly one line: \
+either "PASS" if every claim is supported, or FAIL: "<the exact claim text, copied verbatim>" -- <reason> \
+for the first unsupported claim you find. Do not answer the user's question yourself."""
+
+_LLM_FAIL_PATTERN = re.compile(r'^FAIL:\s*"(?P<claim>.+?)"\s*(?:--|—|-|:)\s*(?P<reason>.*)$', re.DOTALL)
+
+
+class ClaimFailure(BaseModel):
+    """One exact claim from the draft that failed, and why -- shown verbatim
+    to the model on a rewrite and to the user if the draft never passes."""
+
+    claim: str
+    reason: str
 
 
 class ValidationResult(BaseModel):
     passed: bool
     failures: list[str] = []
+    # The exact Verified claims behind `failures`, when the failure is about a claim
+    # (empty for structural failures like a missing section).
+    failing_claims: list[ClaimFailure] = []
 
 
 def _extract_section(draft: str, header: str) -> str | None:
@@ -135,39 +147,71 @@ def _official_chunk_ids_this_session(case_state: CaseState) -> set[str]:
     return ids
 
 
-def check_requirement_claims_grounded(draft: str, case_state: CaseState) -> list[str]:
-    """VERIFIED means grounded in an OFFICIAL knowledge chunk, cited by its
-    chunk id -- not just "some tool succeeded" or a vague appeal to "the
-    official knowledge base." check_documents/evaluate_eligibility operate
-    on SYNTHETIC/mock applicant data, so an applicant-specific finding from
-    them (e.g. "your transcript isn't attested") belongs under SIMULATED,
-    not VERIFIED, even though the *rule* behind it (attestation is
-    required) is OFFICIAL -- and citing the tool/mock result directly is
-    rejected outright, regardless of what else was retrieved this session."""
+_CHUNK_ID_PATTERN = re.compile(r"\b[a-z]+(?:-[a-z]+)*-\d{3}\b")
+_BULLET_PREFIX = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s*")
+
+
+def verified_claims(draft: str) -> list[str]:
+    """The non-trivial claims in the draft's Verified section, one per line
+    or bullet. Assumed/Simulated/Next step content is never returned -- only
+    a claim presented as Verified needs an OFFICIAL chunk behind it."""
     verified_text = _extract_section(draft, "Verified")
-    if not verified_text:
+    if not verified_text or _is_trivial_verified(verified_text):
         return []
-    if _is_trivial_verified(verified_text):
-        return []
+    claims = [_BULLET_PREFIX.sub("", line).strip() for line in verified_text.splitlines()]
+    return [c for c in claims if c and not _is_trivial_verified(c)]
 
-    if _TOOL_RESULT_CITATION_PATTERN.search(verified_text):
-        return [
-            f"The 'Verified' section claims '{verified_text}', but it cites a tool/mock result "
-            "directly -- an applicant-specific finding from check_documents, evaluate_eligibility, "
-            "get_applicant_record, or similar belongs under Simulated, not Verified, even when the "
-            "underlying rule is official."
-        ]
 
+def _cited_label(chunk_id: str, case_state: CaseState) -> str | None:
+    chunk = case_state.retrieved_chunks.get(chunk_id)
+    if chunk is not None:
+        return chunk.label
+    for entry in case_state.tool_history:
+        if entry.tool in ("search_requirements", "evaluate_eligibility") and f"{chunk_id}[ASSUMPTION]" in entry.result_summary.replace(" [", "["):
+            return "ASSUMPTION"
+    return None
+
+
+def verified_claim_failures(draft: str, case_state: CaseState) -> list[ClaimFailure]:
+    """VERIFIED means grounded in an OFFICIAL knowledge chunk retrieved this
+    session, cited by its chunk id -- checked claim by claim. A claim that
+    cites a tool/mock result (check_documents, evaluate_eligibility, ...)
+    belongs under Simulated; one that cites only an ASSUMPTION chunk
+    belongs under Assumed. Claims already filed under Assumed or Simulated
+    are never checked here and never fail."""
     official_ids = _official_chunk_ids_this_session(case_state)
-    if not any(chunk_id in verified_text for chunk_id in official_ids):
-        return [
-            f"The 'Verified' section claims '{verified_text}', but doesn't cite an OFFICIAL "
-            "knowledge chunk id retrieved this session (e.g. 'per attest-001') -- a general "
-            "appeal to the official knowledge base, or a mock-data tool result like "
-            "check_documents, doesn't ground a Verified claim on its own; that belongs under "
-            "Simulated or Assumed instead."
-        ]
-    return []
+    failures = []
+    for claim in verified_claims(draft):
+        if _TOOL_RESULT_CITATION_PATTERN.search(claim):
+            failures.append(
+                ClaimFailure(claim=claim, reason="it cites a tool/mock result, which belongs under Simulated, not Verified")
+            )
+            continue
+        if any(chunk_id in claim for chunk_id in official_ids):
+            continue
+        assumption_ids = [cid for cid in _CHUNK_ID_PATTERN.findall(claim) if _cited_label(cid, case_state) == "ASSUMPTION"]
+        if assumption_ids:
+            reason = (
+                f"it cites {', '.join(assumption_ids)}, an unconfirmed ASSUMPTION rule, not an official one "
+                "-- it belongs under Assumed"
+            )
+        else:
+            reason = (
+                "it doesn't cite an OFFICIAL rule retrieved this session (e.g. 'per attest-001') -- an "
+                "applicant-specific finding belongs under Simulated, an unconfirmed rule under Assumed"
+            )
+        failures.append(ClaimFailure(claim=claim, reason=reason))
+    return failures
+
+
+def _format_claim_failure(failure: ClaimFailure) -> str:
+    return f"Verified claim \"{failure.claim}\" failed: {failure.reason}."
+
+
+def check_requirement_claims_grounded(draft: str, case_state: CaseState) -> list[str]:
+    """String form of verified_claim_failures, one failure per exact claim
+    (the 'Simulated'/'OFFICIAL' wording is what the rewrite request relies on)."""
+    return [_format_claim_failure(f) for f in verified_claim_failures(draft, case_state)]
 
 
 def check_eligibility_statements_grounded(draft: str, case_state: CaseState) -> list[str]:
@@ -296,13 +340,21 @@ def check_missing_documents_requested(draft: str, case_state: CaseState) -> list
 
 
 def llm_verify(draft: str, case_state: CaseState, create: Callable[..., Any], model: str) -> list[str]:
+    """`draft` is whatever text should be checked -- validate_draft passes
+    only the Verified claims. The verifier sees every retrieved chunk's full
+    text, not just the one-line tool summaries: a summary only names the top
+    search hit, which made the verifier reject citations of chunks that
+    really were retrieved (APP-010's elig-002)."""
     tool_outputs = "\n".join(f"- {entry.tool}({entry.args}) -> {entry.result_summary}" for entry in case_state.tool_history)
+    chunks = "\n".join(f"- {c.id} [{c.label}]: {c.text}" for c in case_state.retrieved_chunks.values())
     messages = [
         {"role": "system", "content": LLM_VERIFIER_SYSTEM_PROMPT},
         {
             "role": "user",
             "content": (
-                f"Tool outputs gathered this session:\n{tool_outputs or '(none)'}\n\nDraft answer to check:\n{draft}"
+                f"Tool outputs gathered this session:\n{tool_outputs or '(none)'}\n\n"
+                f"Knowledge chunks retrieved this session:\n{chunks or '(none)'}\n\n"
+                f"Claims presented as Verified:\n{draft}"
             ),
         },
     ]
@@ -325,18 +377,29 @@ def validate_draft(
     create: Callable[..., Any] | None = None,
     model: str | None = None,
 ) -> ValidationResult:
+    """Only a claim presented as Verified can fail for lack of grounding;
+    Assumed and Simulated content is never claim-checked (by the rule pass
+    or the LLM verifier). The remaining checks are structural."""
+    claim_failures = verified_claim_failures(draft, case_state)
     failures = check_required_sections(draft, case_state)
-    failures += check_requirement_claims_grounded(draft, case_state)
+    failures += [_format_claim_failure(f) for f in claim_failures]
     failures += check_eligibility_statements_grounded(draft, case_state)
     failures += check_draft_application_caveated(draft, case_state)
     failures += check_existing_escalation_referenced(draft, case_state)
     failures += check_missing_documents_requested(draft, case_state)
     if failures:
-        return ValidationResult(passed=False, failures=failures)
+        return ValidationResult(passed=False, failures=failures, failing_claims=claim_failures)
 
-    if create is not None and model is not None:
-        llm_failures = llm_verify(draft, case_state, create, model)
+    claims = verified_claims(draft)
+    if claims and create is not None and model is not None:
+        llm_failures = llm_verify("\n".join(f"- {c}" for c in claims), case_state, create, model)
         if llm_failures:
-            return ValidationResult(passed=False, failures=llm_failures)
+            match = _LLM_FAIL_PATTERN.match(llm_failures[0])
+            failing = (
+                ClaimFailure(claim=match["claim"].strip(), reason=match["reason"].strip() or "the verifier found it unsupported")
+                if match
+                else ClaimFailure(claim=claims[0] if len(claims) == 1 else "; ".join(claims), reason=llm_failures[0])
+            )
+            return ValidationResult(passed=False, failures=llm_failures, failing_claims=[failing])
 
     return ValidationResult(passed=True, failures=[])

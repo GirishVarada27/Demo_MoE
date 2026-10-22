@@ -192,10 +192,55 @@ def test_validate_draft_fails_on_missing_sections_without_calling_llm():
     assert calls["n"] == 0  # rule-based failure short-circuits before any LLM call
 
 
+_GROUNDED_DRAFT = (
+    "Verified: Attestation is required for foreign certificates, per attest-001.\n"
+    "Assumed: None.\nSimulated: None.\nNext step: none."
+)
+_GROUNDED_STATE = CaseState(tool_history=[_trace("search_requirements", "1 result(s), top=attest-001 [OFFICIAL] (score=0.9)")])
+
+
 def test_validate_draft_fails_when_llm_verifier_flags_claim():
-    result = validate_draft(VALID_DRAFT, CaseState(), create=_fake_create("FAIL: unsupported claim"), model="m")
+    verdict = 'FAIL: "Attestation is required for foreign certificates, per attest-001." -- unsupported'
+    result = validate_draft(_GROUNDED_DRAFT, _GROUNDED_STATE, create=_fake_create(verdict), model="m")
     assert not result.passed
-    assert result.failures == ["FAIL: unsupported claim"]
+    assert result.failures == [verdict]
+    assert result.failing_claims[0].claim == "Attestation is required for foreign certificates, per attest-001."
+    assert result.failing_claims[0].reason == "unsupported"
+
+
+def test_validate_draft_skips_llm_verifier_when_nothing_is_presented_as_verified():
+    result = validate_draft(VALID_DRAFT, CaseState(), create=_fake_create("FAIL: unsupported claim"), model="m")
+    assert result.passed
+
+
+def test_assumed_and_simulated_claims_pass_without_official_chunk():
+    draft = (
+        "Verified: None.\n"
+        "Assumed: No official CBSE numeric threshold exists, per curr-in-001 (an assumption, verify with MoE).\n"
+        "Simulated: Your mock file shows an attested certificate and transcript.\n"
+        "Next step: none."
+    )
+    case_state = CaseState(tool_history=[_trace("evaluate_eligibility", "verdicts=[curr-in-001[ASSUMPTION]=UNDETERMINABLE], undeterminable=['curr-in-001']")])
+    result = validate_draft(draft, case_state, create=_fake_create("FAIL: should never be asked"), model="m")
+    assert result.passed
+
+
+def test_verified_claim_citing_only_an_assumption_chunk_fails_with_exact_claim():
+    claim = "There is no official CBSE threshold (chunk curr-in-001)."
+    draft = f"Verified:\n- {claim}\nAssumed: None.\nSimulated: None.\nNext step: none."
+    case_state = CaseState(tool_history=[_trace("evaluate_eligibility", "verdicts=[curr-in-001[ASSUMPTION]=UNDETERMINABLE], undeterminable=['curr-in-001']")])
+    result = validate_draft(draft, case_state)
+    assert not result.passed
+    assert [f.claim for f in result.failing_claims] == [claim]
+    assert "curr-in-001, an unconfirmed ASSUMPTION rule" in result.failing_claims[0].reason
+
+
+def test_only_the_ungrounded_verified_claim_fails():
+    grounded = "Attestation is required for foreign certificates, per attest-001."
+    ungrounded = "The fee is AED 50."
+    draft = f"Verified:\n- {grounded}\n- {ungrounded}\nAssumed: None.\nSimulated: None.\nNext step: none."
+    result = validate_draft(draft, _GROUNDED_STATE)
+    assert [f.claim for f in result.failing_claims] == [ungrounded]
 
 
 def test_validate_draft_skips_llm_pass_when_create_not_provided():

@@ -23,7 +23,7 @@ base provenance and unverified gaps: `docs/assumptions.md`.
 pip install -r requirements.txt
 cp .env.example .env   # then fill in credentials -- see Environment below
 
-# Run the full test suite (118 tests, no API credentials needed --
+# Run the full test suite (124 tests, no API credentials needed --
 # every test injects a fake model client, never calls a real API)
 pytest
 
@@ -67,10 +67,11 @@ Only *successful* non-validation tool calls count toward that budget;
 duplicates, declined/rejected calls, and validations don't. A
 draft answer is *never* returned directly — it always passes through
 `agent/validation.py::validate_draft()` first, and in a case turn (one
-that called `get_applicant_record`/`check_documents`/
-`create_draft_application`) only after `evaluate_eligibility` has run
-*this turn*. An earlier draft gets an ordering error back, which doesn't
-count as a validation failure. `record_user_fact` is rejected in code
+that called `get_applicant_record`/`check_documents`/`evaluate_eligibility`/
+`create_draft_application`) only after both `get_applicant_record` and
+`evaluate_eligibility` have run *this turn*, even if the applicant was
+looked up in an earlier turn. An earlier draft gets an ordering error
+back, which doesn't count as a validation failure. `record_user_fact` is rejected in code
 unless the user's message states a new first-person fact. An applicant
 id, a greeting, or a value already on file never qualifies. When the
 budget runs out, the reply names the last step reached and the last
@@ -106,15 +107,19 @@ session-level state (`facts`, `documents`, `curriculum`, `open_questions`,
 tool-call argument.
 
 **Validation (`agent/validation.py`):** rule-based checks first (required
-`Verified`/`Assumed`/`Simulated`/`Next step` sections present; a
-non-trivial "Verified" claim needs an `OFFICIAL`-tagged `search_requirements`/
-`evaluate_eligibility` result or a successful `check_documents` call *this
-session*; an eligibility/status statement needs a successful
-`evaluate_eligibility` call) — if any rule-based check fails, the LLM
-verifier pass is skipped entirely (no point double-checking a draft
-already known to be unsupported). Only if all rule-based checks pass does
-a second, independent model call (`llm_verify`) check the draft against
-the actual tool outputs. A failed draft gets the specific failure reasons
+`Verified`/`Assumed`/`Simulated`/`Next step` sections present; *each*
+claim under Verified must cite an `OFFICIAL` chunk id retrieved this
+session; an eligibility/status statement needs a successful
+`evaluate_eligibility` call). Only Verified claims are ever
+claim-checked. Assumed claims (backed by an `ASSUMPTION` chunk) and
+Simulated claims (from a mock tool) always pass. If any rule-based check
+fails, the LLM verifier is skipped. Otherwise a second, independent model
+call (`llm_verify`) checks only the Verified claims, against the tool
+outputs and the full text of every retrieved chunk. It is skipped
+entirely when nothing is presented as Verified. Failures come back as
+`ValidationResult.failing_claims`, the exact claim text plus a reason.
+The rewrite request and the final escalation/limit message both quote
+them instead of generic text. A failed draft gets the specific failure reasons
 and up to `MAX_REWRITES` (2) rewrites. If it still fails, the
 orchestrator forces `escalate_to_human`. If `check_documents` found a
 document missing that the applicant can supply, the draft must name it,

@@ -210,6 +210,14 @@ def test_duplicate_identical_tool_call_in_one_turn_is_not_reinvoked():
                     ]
                 )
             ),
+            FakeResponse(FakeMessage(tool_calls=[FakeToolCall("c3", "get_applicant_record", {"applicant_id": "APP-002"})])),
+            FakeResponse(
+                FakeMessage(
+                    tool_calls=[
+                        FakeToolCall("c4", "evaluate_eligibility", {"case_state": {"applicant_id": "APP-002", "curriculum": "British (GCE)"}})
+                    ]
+                )
+            ),
             FakeResponse(FakeMessage(content=draft)),
         ]
     )
@@ -217,7 +225,7 @@ def test_duplicate_identical_tool_call_in_one_turn_is_not_reinvoked():
     run_turn(case_state, [], "Check my documents twice, APP-002.", client=object(), model="fake-model", create_fn=create_fn)
 
     tool_names = _tool_names(case_state)
-    assert tool_names == ["check_documents", "check_documents"]
+    assert tool_names == ["check_documents", "check_documents", "get_applicant_record", "evaluate_eligibility"]
     assert "present (" in case_state.tool_history[0].result_summary  # the real invocation
     assert case_state.tool_history[1].result_summary == "duplicate call this turn -- reused prior result, not re-invoked"
 

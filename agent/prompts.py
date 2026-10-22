@@ -58,8 +58,9 @@ you already have that result this turn, use it. A bare greeting with no question
    record_user_fact for a NEW first-person fact the user stated in this message; a greeting, a \
    question, a bare "My applicant ID is X", or something already on file is never a fact to \
    record (the system rejects those calls). For a specific applicant's case, call \
-   evaluate_eligibility before you submit your answer -- an answer submitted for validation \
-   before evaluate_eligibility has run this turn is sent back to you with an ordering error. \
+   get_applicant_record and then evaluate_eligibility before you submit your answer, even if \
+   the applicant was looked up in an earlier turn -- an answer submitted for validation before \
+   both have run this turn is sent back to you with an ordering error. \
    You have a budget of 12 successful tool calls per turn. Do not blindly \
    repeat checks that nothing has changed since, and do not ask the user to repeat information \
    they've already given you.

@@ -99,6 +99,7 @@ def test_run_turn_updates_case_state_on_contradictory_curriculum_without_restart
                     ]
                 )
             ),
+            _FakeResponse(_FakeMessage(tool_calls=[_FakeToolCall("call_1b", "get_applicant_record", {"applicant_id": "APP-002"})])),
             _evaluate_eligibility_response("call_2", "APP-002", "British (GCE)"),
             _FakeResponse(_FakeMessage(content=draft)),
         ]
@@ -112,7 +113,7 @@ def test_run_turn_updates_case_state_on_contradictory_curriculum_without_restart
     # Prior conversation is preserved, not discarded -- this turn's exchange is appended after it.
     assert conversation[0] == {"role": "user", "content": "prior turn"}
     assert conversation[1] == {"role": "assistant", "content": "prior answer"}
-    assert len(conversation) == 8
+    assert len(conversation) == 10
 
 
 def test_run_turn_flags_contradictory_applicant_curriculum_as_open_question():
@@ -194,7 +195,7 @@ def test_run_turn_tool_call_limit_reports_last_failed_claim(tmp_path, monkeypatc
     succeeded = [t for t in case_state.tool_history if t.tool == "search_requirements"]
     assert len(succeeded) == MAX_TOOL_CALLS  # the 13th call was refused, not executed
     assert "searching the published rules (search_requirements)" in result
-    assert "the last claim that failed validation was: Missing required section: 'Verified'" in result
+    assert "the last check that failed validation was: Missing required section: 'Verified'" in result
 
 
 # --- validation failure paths ------------------------------------------------
@@ -245,18 +246,41 @@ def test_run_turn_revision_succeeds_on_second_draft():
 
 def test_run_turn_llm_verifier_fail_triggers_revision_then_escalation(tmp_path, monkeypatch):
     monkeypatch.setattr("tools.escalation._QUEUE_PATH", tmp_path / "escalation_queue.json")
+    monkeypatch.setattr("tools.search_rules._embed", lambda texts: [[1.0] for _ in texts])
     case_state = CaseState()
-    draft = _PASS_SECTIONS.format(next_step="Provide the applicant id.")
+    claim = "Certificates issued abroad must be attested, and the fee is AED 50, per attest-001."
+    draft = f"Verified: {claim}\nAssumed: None.\nSimulated: None.\nNext step: Provide the applicant id."
     create_fn = _dispatching_create(
-        [_FakeResponse(_FakeMessage(content=draft)) for _ in range(3)],
-        verifier_response=_FakeResponse(_FakeMessage(content="FAIL: states a fee not confirmed anywhere")),
+        [_FakeResponse(_FakeMessage(tool_calls=[_FakeToolCall("call_1", "search_requirements", {"query": "attestation"})]))]
+        + [_FakeResponse(_FakeMessage(content=draft)) for _ in range(3)],
+        verifier_response=_FakeResponse(_FakeMessage(content=f'FAIL: "{claim}" -- states a fee not confirmed anywhere')),
     )
 
-    result = run_turn(case_state, [], "hi", client=object(), model="fake-model", create_fn=create_fn)
+    result = run_turn(case_state, [], "Do I need attestation?", client=object(), model="fake-model", create_fn=create_fn)
 
-    assert "escalated" in result.lower()
-    assert case_state.tool_history[-1].tool == "escalate_to_human"
+    # Informational turn -> no ticket, but the reply quotes the exact failing claim and reason.
+    assert case_state.escalation is None
+    assert f'"{claim}" -- states a fee not confirmed anywhere' in result
+
+
+def test_run_turn_case_escalation_shows_exact_failing_claims(tmp_path, monkeypatch):
+    monkeypatch.setattr("tools.escalation._QUEUE_PATH", tmp_path / "escalation_queue.json")
+    case_state = CaseState()
+    claim = "Your certificate meets the official CBSE threshold."
+    draft = f"Verified: {claim}\nAssumed: None.\nSimulated: None.\nNext step: none."
+    create_fn = _dispatching_create(
+        [
+            _FakeResponse(_FakeMessage(tool_calls=[_FakeToolCall("call_1", "get_applicant_record", {"applicant_id": "APP-010"})])),
+            _evaluate_eligibility_response("call_2", "APP-010", "Indian (CBSE)"),
+        ]
+        + [_FakeResponse(_FakeMessage(content=draft)) for _ in range(3)]
+    )
+
+    result = run_turn(case_state, [], "Check APP-010", client=object(), model="fake-model", create_fn=create_fn)
+
     assert case_state.tool_history[-1].args == {"reason": "validation_failed_after_rewrites"}
+    assert f'"{claim}"' in result
+    assert "doesn't cite an OFFICIAL rule" in result
 
 
 def test_run_turn_eligibility_statement_without_evaluate_eligibility_fails_validation(tmp_path, monkeypatch):

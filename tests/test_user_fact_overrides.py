@@ -158,6 +158,8 @@ def test_transcript_unavailable_after_provisional_result_changes_plan_without_ne
                     tool_calls=[FakeToolCall("c4", "record_user_fact", {"fact_key": "attested_transcript", "fact_value": "unavailable"})]
                 )
             ),
+            # get_applicant_record must run again this turn before the draft can be validated.
+            FakeResponse(FakeMessage(tool_calls=[FakeToolCall("c4b", "get_applicant_record", {"applicant_id": "APP-001"})])),
             FakeResponse(
                 FakeMessage(
                     tool_calls=[
@@ -193,10 +195,10 @@ def test_transcript_unavailable_after_provisional_result_changes_plan_without_ne
     assert "curr-us-002[ASSUMPTION]=UNDETERMINABLE" in turn2_eligibility.result_summary
     assert "curr-us-002[ASSUMPTION]=PASS" not in turn2_eligibility.result_summary
 
-    # 3. The plan differs from the previous turn -- turn 2 doesn't repeat turn 1's
-    #    get_applicant_record (already known) and leads with record_user_fact instead.
+    # 3. The plan differs from the previous turn -- turn 2 leads with record_user_fact
+    #    (get_applicant_record still re-runs: validation requires it every case turn).
     turn2_tools = _tool_names(case_state, start=steps_after_turn1)
-    assert turn2_tools == ["record_user_fact", "check_documents", "evaluate_eligibility"]
+    assert turn2_tools == ["record_user_fact", "get_applicant_record", "check_documents", "evaluate_eligibility"]
     assert turn2_tools != turn1_tools
 
     # 4. No new ticket -- the agent offered options instead of escalating.
