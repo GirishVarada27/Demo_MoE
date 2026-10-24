@@ -1,0 +1,10 @@
+test:     tests/test_tools.py::test_create_draft_application_simulate_failure
+status:   PASSED
+duration: 0.78s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_tools.py::test_create_draft_application_simulate_failure
+1 passed in 0.18s

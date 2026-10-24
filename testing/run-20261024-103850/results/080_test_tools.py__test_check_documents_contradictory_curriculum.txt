@@ -1,0 +1,10 @@
+test:     tests/test_tools.py::test_check_documents_contradictory_curriculum
+status:   PASSED
+duration: 0.75s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_tools.py::test_check_documents_contradictory_curriculum
+1 passed in 0.17s

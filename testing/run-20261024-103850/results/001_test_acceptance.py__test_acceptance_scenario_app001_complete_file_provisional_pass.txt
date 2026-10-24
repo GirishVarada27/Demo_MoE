@@ -1,0 +1,10 @@
+test:     tests/test_acceptance.py::test_acceptance_scenario[app001_complete_file_provisional_pass]
+status:   PASSED
+duration: 0.82s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_acceptance.py::test_acceptance_scenario[app001_complete_file_provisional_pass]
+1 passed in 0.25s

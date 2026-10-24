@@ -1,0 +1,10 @@
+test:     tests/test_acceptance.py::test_acceptance_scenario[missing_applicant_id_asks_instead_of_guessing]
+status:   PASSED
+duration: 0.77s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_acceptance.py::test_acceptance_scenario[missing_applicant_id_asks_instead_of_guessing]
+1 passed in 0.18s

@@ -1,0 +1,10 @@
+test:     tests/test_app003_tool_budget.py::test_missing_document_draft_that_doesnt_ask_for_it_fails_validation
+status:   PASSED
+duration: 0.78s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_app003_tool_budget.py::test_missing_document_draft_that_doesnt_ask_for_it_fails_validation
+1 passed in 0.18s

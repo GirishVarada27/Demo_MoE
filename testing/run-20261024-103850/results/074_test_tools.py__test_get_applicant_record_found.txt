@@ -1,0 +1,10 @@
+test:     tests/test_tools.py::test_get_applicant_record_found
+status:   PASSED
+duration: 0.75s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_tools.py::test_get_applicant_record_found
+1 passed in 0.17s

@@ -1,0 +1,10 @@
+test:     tests/test_user_fact_overrides.py::test_document_override_flags_unavailable_attested_doc
+status:   PASSED
+duration: 0.75s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_user_fact_overrides.py::test_document_override_flags_unavailable_attested_doc
+1 passed in 0.16s

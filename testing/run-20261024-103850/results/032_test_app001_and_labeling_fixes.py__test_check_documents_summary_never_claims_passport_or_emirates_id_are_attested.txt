@@ -1,0 +1,10 @@
+test:     tests/test_app001_and_labeling_fixes.py::test_check_documents_summary_never_claims_passport_or_emirates_id_are_attested
+status:   PASSED
+duration: 0.75s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_app001_and_labeling_fixes.py::test_check_documents_summary_never_claims_passport_or_emirates_id_are_attested
+1 passed in 0.17s

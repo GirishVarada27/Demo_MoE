@@ -1,0 +1,10 @@
+test:     tests/test_validation.py::test_no_eligibility_language_skips_check_entirely
+status:   PASSED
+duration: 0.81s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_validation.py::test_no_eligibility_language_skips_check_entirely
+1 passed in 0.15s

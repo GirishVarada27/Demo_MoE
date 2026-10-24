@@ -1,0 +1,10 @@
+test:     tests/test_tools.py::test_tool_registry_is_consistent
+status:   PASSED
+duration: 0.75s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_tools.py::test_tool_registry_is_consistent
+1 passed in 0.17s

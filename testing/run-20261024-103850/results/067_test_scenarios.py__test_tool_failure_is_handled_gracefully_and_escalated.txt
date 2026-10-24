@@ -1,0 +1,10 @@
+test:     tests/test_scenarios.py::test_tool_failure_is_handled_gracefully_and_escalated
+status:   PASSED
+duration: 0.77s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_scenarios.py::test_tool_failure_is_handled_gracefully_and_escalated
+1 passed in 0.18s

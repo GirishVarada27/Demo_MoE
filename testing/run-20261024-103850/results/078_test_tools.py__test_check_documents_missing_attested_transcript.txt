@@ -1,0 +1,10 @@
+test:     tests/test_tools.py::test_check_documents_missing_attested_transcript
+status:   PASSED
+duration: 0.74s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_tools.py::test_check_documents_missing_attested_transcript
+1 passed in 0.16s

@@ -1,0 +1,10 @@
+test:     tests/test_validation.py::test_assumed_and_simulated_claims_pass_without_official_chunk
+status:   PASSED
+duration: 0.78s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_validation.py::test_assumed_and_simulated_claims_pass_without_official_chunk
+1 passed in 0.15s

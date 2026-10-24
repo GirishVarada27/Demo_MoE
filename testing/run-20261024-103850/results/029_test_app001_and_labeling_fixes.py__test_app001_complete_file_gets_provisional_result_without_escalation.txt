@@ -1,0 +1,10 @@
+test:     tests/test_app001_and_labeling_fixes.py::test_app001_complete_file_gets_provisional_result_without_escalation
+status:   PASSED
+duration: 0.76s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_app001_and_labeling_fixes.py::test_app001_complete_file_gets_provisional_result_without_escalation
+1 passed in 0.19s

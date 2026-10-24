@@ -1,0 +1,10 @@
+test:     tests/test_no_rule_found_escalation.py::test_handle_no_rule_found_defers_when_search_actually_finds_a_match
+status:   PASSED
+duration: 0.77s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_no_rule_found_escalation.py::test_handle_no_rule_found_defers_when_search_actually_finds_a_match
+1 passed in 0.19s

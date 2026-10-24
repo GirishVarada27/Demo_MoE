@@ -1,0 +1,10 @@
+test:     tests/test_user_fact_overrides.py::test_document_override_is_a_noop_without_a_matching_fact
+status:   PASSED
+duration: 0.71s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_user_fact_overrides.py::test_document_override_is_a_noop_without_a_matching_fact
+1 passed in 0.16s

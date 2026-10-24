@@ -1,0 +1,10 @@
+test:     tests/test_tools.py::test_evaluate_eligibility_unsupported_curriculum_returns_none_chunk
+status:   PASSED
+duration: 0.77s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_tools.py::test_evaluate_eligibility_unsupported_curriculum_returns_none_chunk
+1 passed in 0.19s

@@ -1,0 +1,10 @@
+test:     tests/test_validation.py::test_eligibility_statement_passes_with_successful_evaluate_eligibility
+status:   PASSED
+duration: 0.78s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_validation.py::test_eligibility_statement_passes_with_successful_evaluate_eligibility
+1 passed in 0.14s

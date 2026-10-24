@@ -1,0 +1,10 @@
+test:     tests/test_scenarios.py::test_contradictory_curriculum_is_detected_and_flagged_as_open_question
+status:   PASSED
+duration: 0.75s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_scenarios.py::test_contradictory_curriculum_is_detected_and_flagged_as_open_question
+1 passed in 0.16s

@@ -1,0 +1,10 @@
+test:     tests/test_change_of_circumstances.py::test_draft_application_without_determinable_eligibility_requires_caveat
+status:   PASSED
+duration: 0.74s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_change_of_circumstances.py::test_draft_application_without_determinable_eligibility_requires_caveat
+1 passed in 0.16s

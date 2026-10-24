@@ -1,0 +1,10 @@
+test:     tests/test_validation.py::test_requirement_claims_grounded_rejects_verified_statement_citing_a_tool_result
+status:   PASSED
+duration: 0.73s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_validation.py::test_requirement_claims_grounded_rejects_verified_statement_citing_a_tool_result
+1 passed in 0.14s

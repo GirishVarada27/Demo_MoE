@@ -1,0 +1,10 @@
+test:     tests/test_user_fact_overrides.py::test_eligibility_override_downgrades_pass_to_undeterminable
+status:   PASSED
+duration: 0.85s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_user_fact_overrides.py::test_eligibility_override_downgrades_pass_to_undeterminable
+1 passed in 0.18s

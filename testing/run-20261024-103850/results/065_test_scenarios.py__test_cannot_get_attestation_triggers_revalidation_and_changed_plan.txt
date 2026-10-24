@@ -1,0 +1,10 @@
+test:     tests/test_scenarios.py::test_cannot_get_attestation_triggers_revalidation_and_changed_plan
+status:   PASSED
+duration: 0.79s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_scenarios.py::test_cannot_get_attestation_triggers_revalidation_and_changed_plan
+1 passed in 0.19s

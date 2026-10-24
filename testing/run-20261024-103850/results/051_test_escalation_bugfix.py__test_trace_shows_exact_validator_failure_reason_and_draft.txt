@@ -1,0 +1,10 @@
+test:     tests/test_escalation_bugfix.py::test_trace_shows_exact_validator_failure_reason_and_draft
+status:   PASSED
+duration: 0.80s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_escalation_bugfix.py::test_trace_shows_exact_validator_failure_reason_and_draft
+1 passed in 0.19s

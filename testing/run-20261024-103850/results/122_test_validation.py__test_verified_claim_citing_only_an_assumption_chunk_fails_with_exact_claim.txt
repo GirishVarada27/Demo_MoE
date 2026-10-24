@@ -1,0 +1,10 @@
+test:     tests/test_validation.py::test_verified_claim_citing_only_an_assumption_chunk_fails_with_exact_claim
+status:   PASSED
+duration: 0.72s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_validation.py::test_verified_claim_citing_only_an_assumption_chunk_fails_with_exact_claim
+1 passed in 0.15s

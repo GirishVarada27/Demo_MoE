@@ -1,0 +1,10 @@
+test:     tests/test_tools.py::test_escalate_to_human_writes_ticket
+status:   PASSED
+duration: 0.78s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_tools.py::test_escalate_to_human_writes_ticket
+1 passed in 0.20s

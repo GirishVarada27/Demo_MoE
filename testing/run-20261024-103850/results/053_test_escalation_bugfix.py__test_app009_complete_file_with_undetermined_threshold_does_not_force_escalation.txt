@@ -1,0 +1,10 @@
+test:     tests/test_escalation_bugfix.py::test_app009_complete_file_with_undetermined_threshold_does_not_force_escalation
+status:   PASSED
+duration: 0.75s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_escalation_bugfix.py::test_app009_complete_file_with_undetermined_threshold_does_not_force_escalation
+1 passed in 0.16s

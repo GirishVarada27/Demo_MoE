@@ -1,0 +1,10 @@
+test:     tests/test_acceptance.py::test_acceptance_scenario[failure_injection_forces_retry_then_escalate]
+status:   PASSED
+duration: 0.93s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_acceptance.py::test_acceptance_scenario[failure_injection_forces_retry_then_escalate]
+1 passed in 0.23s

@@ -1,0 +1,10 @@
+test:     tests/test_escalation_bugfix.py::test_documents_question_naming_an_applicant_still_calls_search_only
+status:   PASSED
+duration: 0.75s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_escalation_bugfix.py::test_documents_question_naming_an_applicant_still_calls_search_only
+1 passed in 0.17s

@@ -1,0 +1,10 @@
+test:     tests/test_no_rule_found_escalation.py::test_app006_greeting_escalates_on_missing_rule_not_validation_failure
+status:   PASSED
+duration: 0.76s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_no_rule_found_escalation.py::test_app006_greeting_escalates_on_missing_rule_not_validation_failure
+1 passed in 0.17s

@@ -1,0 +1,10 @@
+test:     tests/test_app003_tool_budget.py::test_bare_applicant_id_never_records_a_user_fact
+status:   PASSED
+duration: 0.74s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_app003_tool_budget.py::test_bare_applicant_id_never_records_a_user_fact
+1 passed in 0.17s

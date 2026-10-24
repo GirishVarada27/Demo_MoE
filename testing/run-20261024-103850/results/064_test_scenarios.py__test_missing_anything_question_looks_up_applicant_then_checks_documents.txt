@@ -1,0 +1,10 @@
+test:     tests/test_scenarios.py::test_missing_anything_question_looks_up_applicant_then_checks_documents
+status:   PASSED
+duration: 0.75s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_scenarios.py::test_missing_anything_question_looks_up_applicant_then_checks_documents
+1 passed in 0.17s

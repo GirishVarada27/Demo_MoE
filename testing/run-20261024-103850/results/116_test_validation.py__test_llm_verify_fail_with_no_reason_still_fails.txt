@@ -1,0 +1,10 @@
+test:     tests/test_validation.py::test_llm_verify_fail_with_no_reason_still_fails
+status:   PASSED
+duration: 0.83s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_validation.py::test_llm_verify_fail_with_no_reason_still_fails
+1 passed in 0.17s

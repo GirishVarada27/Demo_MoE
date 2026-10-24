@@ -1,0 +1,10 @@
+test:     tests/test_escalation_bugfix.py::test_prompt_forces_no_tool_sequence_and_guides_generic_questions
+status:   PASSED
+duration: 0.74s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_escalation_bugfix.py::test_prompt_forces_no_tool_sequence_and_guides_generic_questions
+1 passed in 0.16s

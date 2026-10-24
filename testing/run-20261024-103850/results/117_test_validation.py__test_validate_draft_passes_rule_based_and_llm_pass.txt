@@ -1,0 +1,10 @@
+test:     tests/test_validation.py::test_validate_draft_passes_rule_based_and_llm_pass
+status:   PASSED
+duration: 0.84s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_validation.py::test_validate_draft_passes_rule_based_and_llm_pass
+1 passed in 0.17s

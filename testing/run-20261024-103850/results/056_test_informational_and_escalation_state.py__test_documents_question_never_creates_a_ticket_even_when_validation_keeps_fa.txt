@@ -1,0 +1,10 @@
+test:     tests/test_informational_and_escalation_state.py::test_documents_question_never_creates_a_ticket_even_when_validation_keeps_failing
+status:   PASSED
+duration: 0.77s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_informational_and_escalation_state.py::test_documents_question_never_creates_a_ticket_even_when_validation_keeps_failing
+1 passed in 0.19s

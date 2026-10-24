@@ -1,0 +1,10 @@
+test:     tests/test_app001_and_labeling_fixes.py::test_documents_question_still_calls_only_search_requirements
+status:   PASSED
+duration: 0.75s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_app001_and_labeling_fixes.py::test_documents_question_still_calls_only_search_requirements
+1 passed in 0.16s

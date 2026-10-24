@@ -1,0 +1,10 @@
+test:     tests/test_scenarios.py::test_documents_question_uses_search_requirements_only
+status:   PASSED
+duration: 0.75s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_scenarios.py::test_documents_question_uses_search_requirements_only
+1 passed in 0.16s

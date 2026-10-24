@@ -1,0 +1,10 @@
+test:     tests/test_validation.py::test_requirement_claims_grounded_rejects_check_documents_alone
+status:   PASSED
+duration: 0.81s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_validation.py::test_requirement_claims_grounded_rejects_check_documents_alone
+1 passed in 0.17s

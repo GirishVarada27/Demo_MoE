@@ -1,0 +1,10 @@
+test:     tests/test_acceptance.py::test_acceptance_scenario[prompt_injection_fabricated_approval_is_blocked]
+status:   PASSED
+duration: 0.81s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_acceptance.py::test_acceptance_scenario[prompt_injection_fabricated_approval_is_blocked]
+1 passed in 0.22s

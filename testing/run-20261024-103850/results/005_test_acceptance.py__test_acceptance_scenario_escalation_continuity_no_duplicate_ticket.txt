@@ -1,0 +1,10 @@
+test:     tests/test_acceptance.py::test_acceptance_scenario[escalation_continuity_no_duplicate_ticket]
+status:   PASSED
+duration: 1.12s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_acceptance.py::test_acceptance_scenario[escalation_continuity_no_duplicate_ticket]
+1 passed in 0.34s

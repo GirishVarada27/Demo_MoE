@@ -1,0 +1,10 @@
+test:     tests/test_config.py::test_openai_mode_selected_when_endpoint_unset
+status:   PASSED
+duration: 0.71s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_config.py::test_openai_mode_selected_when_endpoint_unset
+1 passed in 0.13s

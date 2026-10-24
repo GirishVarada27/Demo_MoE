@@ -1,0 +1,10 @@
+test:     tests/test_acceptance.py::test_acceptance_scenario[no_rule_found_app006]
+status:   PASSED
+duration: 0.82s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_acceptance.py::test_acceptance_scenario[no_rule_found_app006]
+1 passed in 0.23s

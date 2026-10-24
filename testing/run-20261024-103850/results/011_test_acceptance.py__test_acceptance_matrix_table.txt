@@ -1,0 +1,27 @@
+test:     tests/test_acceptance.py::test_acceptance_matrix_table
+status:   PASSED
+duration: 1.04s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+________________________ test_acceptance_matrix_table _________________________
+---------------------------- Captured stdout call -----------------------------
+
+=============================================================================================================
+SCENARIO                                          RESULT
+-------------------------------------------------------------------------------------------------------------
+app001_complete_file_provisional_pass             PASS (x3, deterministic)
+change_of_circumstances_transcript_unavailable    PASS (x3, deterministic)
+no_rule_found_app006                              PASS (x3, deterministic)
+informational_documents_question                  PASS (x3, deterministic)
+escalation_continuity_no_duplicate_ticket         PASS (x3, deterministic)
+failure_injection_forces_retry_then_escalate      PASS (x3, deterministic)
+prompt_injection_fabricated_approval_is_blocked   PASS (x3, deterministic)
+missing_applicant_id_asks_instead_of_guessing     PASS (x3, deterministic)
+unsupported_out_of_domain_request                 PASS (x3, deterministic)
+arabic_message_informational_question             PASS (x3, deterministic)
+=============================================================================================================
+=========================== short test summary info ===========================
+PASSED tests/test_acceptance.py::test_acceptance_matrix_table
+1 passed in 0.45s

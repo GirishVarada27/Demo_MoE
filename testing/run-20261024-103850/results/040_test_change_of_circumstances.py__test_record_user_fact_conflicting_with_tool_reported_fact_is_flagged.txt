@@ -1,0 +1,10 @@
+test:     tests/test_change_of_circumstances.py::test_record_user_fact_conflicting_with_tool_reported_fact_is_flagged
+status:   PASSED
+duration: 0.78s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_change_of_circumstances.py::test_record_user_fact_conflicting_with_tool_reported_fact_is_flagged
+1 passed in 0.20s

@@ -1,0 +1,10 @@
+test:     tests/test_tools.py::test_search_requirements_returns_empty_when_nothing_relevant
+status:   PASSED
+duration: 0.76s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_tools.py::test_search_requirements_returns_empty_when_nothing_relevant
+1 passed in 0.17s

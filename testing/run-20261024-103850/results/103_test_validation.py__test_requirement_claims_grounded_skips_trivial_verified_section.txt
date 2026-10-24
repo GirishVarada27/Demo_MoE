@@ -1,0 +1,10 @@
+test:     tests/test_validation.py::test_requirement_claims_grounded_skips_trivial_verified_section
+status:   PASSED
+duration: 0.71s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_validation.py::test_requirement_claims_grounded_skips_trivial_verified_section
+1 passed in 0.15s

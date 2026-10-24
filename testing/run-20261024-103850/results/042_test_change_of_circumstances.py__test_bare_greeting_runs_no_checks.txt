@@ -1,0 +1,10 @@
+test:     tests/test_change_of_circumstances.py::test_bare_greeting_runs_no_checks
+status:   PASSED
+duration: 0.76s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_change_of_circumstances.py::test_bare_greeting_runs_no_checks
+1 passed in 0.16s

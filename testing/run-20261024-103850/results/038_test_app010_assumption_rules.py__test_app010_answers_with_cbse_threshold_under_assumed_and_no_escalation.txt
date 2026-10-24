@@ -1,0 +1,10 @@
+test:     tests/test_app010_assumption_rules.py::test_app010_answers_with_cbse_threshold_under_assumed_and_no_escalation
+status:   PASSED
+duration: 0.76s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_app010_assumption_rules.py::test_app010_answers_with_cbse_threshold_under_assumed_and_no_escalation
+1 passed in 0.18s

@@ -1,0 +1,10 @@
+test:     tests/test_user_fact_overrides.py::test_transcript_unavailable_after_provisional_result_changes_plan_without_new_ticket
+status:   PASSED
+duration: 0.78s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_user_fact_overrides.py::test_transcript_unavailable_after_provisional_result_changes_plan_without_new_ticket
+1 passed in 0.19s

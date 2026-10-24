@@ -1,0 +1,10 @@
+test:     tests/test_acceptance.py::test_acceptance_scenario[unsupported_out_of_domain_request]
+status:   PASSED
+duration: 0.76s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_acceptance.py::test_acceptance_scenario[unsupported_out_of_domain_request]
+1 passed in 0.18s

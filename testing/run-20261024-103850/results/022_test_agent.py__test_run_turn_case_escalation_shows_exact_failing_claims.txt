@@ -1,0 +1,10 @@
+test:     tests/test_agent.py::test_run_turn_case_escalation_shows_exact_failing_claims
+status:   PASSED
+duration: 0.81s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_agent.py::test_run_turn_case_escalation_shows_exact_failing_claims
+1 passed in 0.19s

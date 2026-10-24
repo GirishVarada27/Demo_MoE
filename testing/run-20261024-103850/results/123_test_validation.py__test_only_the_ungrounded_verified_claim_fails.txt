@@ -1,0 +1,10 @@
+test:     tests/test_validation.py::test_only_the_ungrounded_verified_claim_fails
+status:   PASSED
+duration: 0.69s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_validation.py::test_only_the_ungrounded_verified_claim_fails
+1 passed in 0.14s

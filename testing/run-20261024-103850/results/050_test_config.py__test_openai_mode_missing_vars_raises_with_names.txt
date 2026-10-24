@@ -1,0 +1,10 @@
+test:     tests/test_config.py::test_openai_mode_missing_vars_raises_with_names
+status:   PASSED
+duration: 0.71s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_config.py::test_openai_mode_missing_vars_raises_with_names
+1 passed in 0.13s

@@ -1,0 +1,10 @@
+test:     tests/test_change_of_circumstances.py::test_prompt_instructs_no_checks_on_bare_greeting_and_recording_user_facts
+status:   PASSED
+duration: 0.75s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_change_of_circumstances.py::test_prompt_instructs_no_checks_on_bare_greeting_and_recording_user_facts
+1 passed in 0.16s

@@ -1,0 +1,10 @@
+test:     tests/test_scenarios.py::test_unsupported_request_is_declined_with_a_next_step
+status:   PASSED
+duration: 0.80s
+exit:     0
+========================================================================
+.                                                                        [100%]
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_scenarios.py::test_unsupported_request_is_declined_with_a_next_step
+1 passed in 0.18s
