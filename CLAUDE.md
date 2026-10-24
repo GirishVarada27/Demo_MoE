@@ -137,6 +137,14 @@ specifically is the system's own safety net called directly (unwrapped)
 from multiple places in `run_turn` — it must never be the thing that
 crashes a turn.
 
+**HTTP API (`api/server.py`):** FastAPI over `run_turn`:
+`POST /api/v1/chat {message, session_id?}`, `GET /health` and
+`DELETE /api/v1/sessions/{id}`. Sessions are held in process memory, so
+run a single worker (`uvicorn api.server:app`). **Data dir:** every mock
+store resolves through `tools/_data_dir.py`. Setting `MOE_DATA_URL=file:///...`
+moves all of them, which load tests rely on so they never write `data/`.
+Load-test setup lives in `perf/` (see `perf/README.md`).
+
 **Streamlit (`ui/app.py`) needs an explicit `sys.path` fix** at the top of
 the file (inserting the repo root) before its absolute imports —
 `streamlit run ui/app.py` puts `ui/`'s own directory on `sys.path`, not the

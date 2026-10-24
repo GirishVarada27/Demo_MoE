@@ -17,6 +17,10 @@ env/
 # Streamlit
 .streamlit/
 
+# Load-test run folders (keep only the committed baseline)
+perf-results/*
+!perf-results/baseline.json
+
 # Editors / OS
 .vscode/
 .idea/

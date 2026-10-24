@@ -1,0 +1,64 @@
+{
+  "app_name": "MOE certificate equivalency agent",
+  "base_url": "http://127.0.0.1:{port}",
+  "start": {
+    "command": [".venv/Scripts/python.exe", "-m", "uvicorn", "api.server:app", "--host", "127.0.0.1", "--port", "{port}", "--no-access-log"],
+    "cwd": ".",
+    "health_path": "/health",
+    "startup_timeout_s": 60
+  },
+  "db": {
+    "env_var": "MOE_DATA_URL",
+    "seed": {
+      "copy": [{"from": "data/applicants.json", "to": "applicants.json"}],
+      "reset": {"escalation_queue.json": "[]", "draft_applications.json": "[]"}
+    }
+  },
+  "db_guard": {
+    "allowed_schemes": ["file"],
+    "protected_paths": ["data"],
+    "prod_env_vars": ["MOE_DATA_URL"],
+    "prod_db_urls": [],
+    "prod_base_urls": []
+  },
+  "llm": {
+    "mock": {
+      "script": "perf/mock_llm_script.json",
+      "chat_latency_ms": 300,
+      "chat_jitter_ms": 100,
+      "embed_latency_ms": 30,
+      "env": {
+        "AZURE_OPENAI_ENDPOINT": "http://127.0.0.1:{mock_port}",
+        "AZURE_OPENAI_API_KEY": "mock-key",
+        "AZURE_OPENAI_DEPLOYMENT": "mock-chat",
+        "EMBEDDING_DEPLOYMENT": "mock-embedding"
+      }
+    },
+    "real": {"max_tps": 0.2, "max_vus": 2}
+  },
+  "request_timeout": "120s",
+  "data_pools": {
+    "applicants": ["APP-001", "APP-002", "APP-004", "APP-005", "APP-007", "APP-008", "APP-009", "APP-010"]
+  },
+  "flows": [
+    {
+      "name": "equivalency_check",
+      "weight": 1,
+      "steps": [
+        {
+          "name": "POST /api/v1/chat",
+          "method": "POST",
+          "path": "/api/v1/chat",
+          "body": {
+            "message": "My applicant ID is {{pool:applicants}}. Can you check my certificate equivalency?",
+            "session_id": "{{session}}"
+          },
+          "expect_status": [200],
+          "json_not_empty": ["reply"],
+          "json_equals": {"escalated": false}
+        }
+      ]
+    }
+  ],
+  "results_dir": "perf-results"
+}

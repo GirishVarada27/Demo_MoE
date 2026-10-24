@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 from uuid import uuid4
 
 from schemas import EscalateToHumanResult, EscalationTicket
+from tools._data_dir import data_dir
 
-_QUEUE_PATH = Path(__file__).resolve().parent.parent / "data" / "escalation_queue.json"
+_QUEUE_PATH = data_dir() / "escalation_queue.json"
 
 ESCALATE_TO_HUMAN_TOOL_SCHEMA = {
     "type": "function",

@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
-from pathlib import Path
 
 from schemas import ApplicantLookupResult, ApplicantRecord
+from tools._data_dir import data_dir
 
-_DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "applicants.json"
+_DATA_PATH = data_dir() / "applicants.json"
 
 GET_APPLICANT_RECORD_TOOL_SCHEMA = {
     "type": "function",

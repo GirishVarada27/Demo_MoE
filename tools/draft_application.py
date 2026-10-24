@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 from uuid import uuid4
 
 from schemas import CreateDraftApplicationResult, DraftApplication
+from tools._data_dir import data_dir
 from tools.applicant_lookup import get_applicant_record
 
-_STORE_PATH = Path(__file__).resolve().parent.parent / "data" / "draft_applications.json"
+_STORE_PATH = data_dir() / "draft_applications.json"
 
 CREATE_DRAFT_APPLICATION_TOOL_SCHEMA = {
     "type": "function",
