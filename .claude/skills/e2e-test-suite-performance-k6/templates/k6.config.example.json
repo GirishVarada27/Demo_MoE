@@ -1,0 +1,35 @@
+{
+  "app_name": "CHANGE ME",
+  "base_url": "http://127.0.0.1:{port}",
+  "start": {
+    "command": ["CHANGE", "ME", "--port", "{port}"],
+    "cwd": ".",
+    "health_path": "/health",
+    "startup_timeout_s": 60
+  },
+  "db": {
+    "env_var": "DATABASE_URL",
+    "seed": {"command": null}
+  },
+  "db_guard": {
+    "allowed_schemes": [],
+    "protected_paths": [],
+    "prod_env_vars": ["DATABASE_URL"],
+    "prod_db_urls": [],
+    "prod_base_urls": []
+  },
+  "headers": {},
+  "pass_env": [],
+  "request_timeout": "60s",
+  "data_pools": {},
+  "flows": [
+    {
+      "name": "main_journey",
+      "weight": 1,
+      "steps": [
+        {"name": "GET /health", "method": "GET", "path": "/health", "expect_status": [200]}
+      ]
+    }
+  ],
+  "results_dir": "perf-results"
+}

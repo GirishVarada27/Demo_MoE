@@ -27,6 +27,9 @@ security-results/
 # Lock files for the JSON mock stores (tools/_json_store.py)
 *.json.lock
 
+# Personal Claude Code settings (project skills in .claude/skills are shared)
+.claude/settings.local.json
+
 # Editors / OS
 .vscode/
 .idea/

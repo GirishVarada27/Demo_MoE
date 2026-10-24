@@ -1,0 +1,22 @@
+{
+  "app_name": "CHANGE ME",
+  "languages": ["python"],
+  "source_paths": ["src"],
+  "config_paths": [],
+  "exclude_paths": [".venv", "node_modules", "tests", "security-results"],
+  "python": {"venv_python": null, "requirements": ["requirements.txt"]},
+  "node_paths": [],
+  "fail_on": "high",
+  "accepted_risks": "security/accepted-risks.json",
+  "results_dir": "security-results",
+  "base_url": "http://127.0.0.1:{port}",
+  "start": {"command": ["CHANGE", "ME", "--port", "{port}"], "cwd": ".", "health_path": "/health", "startup_timeout_s": 60},
+  "db": {"env_var": "DATABASE_URL", "seed": {"command": null}},
+  "db_guard": {"allowed_schemes": [], "protected_paths": [], "prod_env_vars": ["DATABASE_URL"], "prod_db_urls": [], "prod_base_urls": []},
+  "dast": {
+    "auth_headers": {},
+    "allowed_public_paths": [],
+    "endpoints": [{"name": "health", "method": "GET", "path": "/health", "public": true}],
+    "rate_limit_probe": null
+  }
+}

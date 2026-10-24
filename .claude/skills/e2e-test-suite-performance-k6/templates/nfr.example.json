@@ -1,0 +1,14 @@
+{
+  "expected_tps": null,
+  "projected_tps": null,
+  "projected_by": null,
+  "concurrent_users": null,
+  "latency_ms": {"p95": null, "p99": null},
+  "max_error_rate": 0.01,
+  "think_time_s": 2,
+  "durations": {"smoke": "20s", "load": "2m", "projected": "2m", "concurrency": "1m", "stress": "5m", "soak": null},
+  "stress_factor": 1.5,
+  "regression_tolerance_pct": 15,
+  "captured_at": null,
+  "captured_from": "user"
+}
