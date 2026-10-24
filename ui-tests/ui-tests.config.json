@@ -1,0 +1,39 @@
+{
+  "app_name": "MOE certificate equivalency agent (Streamlit UI)",
+  "project_dir": "ui-tests",
+  "results_dir": "ui-results",
+  "default_browsers": ["chromium"],
+  "workers": 2,
+  "retries": 1,
+  "base_url": "http://127.0.0.1:{port}",
+  "start": {
+    "command": [".venv/Scripts/python.exe", "-m", "streamlit", "run", "ui/app.py",
+                "--server.port", "{port}", "--server.address", "127.0.0.1", "--server.headless", "true",
+                "--server.fileWatcherType", "none", "--server.runOnSave", "false", "--browser.gatherUsageStats", "false"],
+    "cwd": ".",
+    "health_path": "/_stcore/health",
+    "startup_timeout_s": 90
+  },
+  "db": {
+    "env_var": "MOE_DATA_URL",
+    "seed": {
+      "copy": [{"from": "data/applicants.json", "to": "applicants.json"}],
+      "reset": {"escalation_queue.json": "[]", "draft_applications.json": "[]"}
+    }
+  },
+  "db_guard": {"allowed_schemes": ["file"], "protected_paths": ["data"], "prod_env_vars": ["MOE_DATA_URL"]},
+  "protected_paths": ["data"],
+  "llm": {
+    "mock": {
+      "script": "ui-tests/mock_llm_script.json",
+      "chat_latency_ms": 30,
+      "embed_latency_ms": 5,
+      "env": {
+        "AZURE_OPENAI_ENDPOINT": "http://127.0.0.1:{mock_port}",
+        "AZURE_OPENAI_API_KEY": "mock-key",
+        "AZURE_OPENAI_DEPLOYMENT": "mock-chat",
+        "EMBEDDING_DEPLOYMENT": "mock-embedding"
+      }
+    }
+  }
+}

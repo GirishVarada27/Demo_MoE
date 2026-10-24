@@ -1,0 +1,12 @@
+{
+  "name": "moe-ui-tests",
+  "private": true,
+  "description": "Playwright UI regression tests for the MOE certificate equivalency Streamlit app. Run them through the e2e-test-suite-ui-playwright skill (scripts/run_ui.py), which starts the app against an isolated test data dir and a mock model.",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report reports/html"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0"
+  }
+}

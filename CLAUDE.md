@@ -166,7 +166,10 @@ OS file lock (`*.json.lock`) and replaces the file atomically. Never
 read-modify-write them directly. **Data dir:** every mock
 store resolves through `tools/_data_dir.py`. Setting `MOE_DATA_URL=file:///...`
 moves all of them, which load tests rely on so they never write `data/`.
-Load-test setup lives in `perf/` (see `perf/README.md`).
+Load-test setup lives in `perf/` (see `perf/README.md`). Playwright UI
+regression tests live in `ui-tests/` (see `ui-tests/README.md`). They drive
+the Streamlit UI against an isolated data dir and a mock model, so a UI
+change needs its spec, and any visual baseline, updated in the same change.
 
 **Streamlit (`ui/app.py`) needs an explicit `sys.path` fix** at the top of
 the file (inserting the repo root) before its absolute imports —

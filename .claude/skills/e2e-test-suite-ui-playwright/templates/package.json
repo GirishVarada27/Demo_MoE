@@ -1,0 +1,12 @@
+{
+  "name": "CHANGE-ME-ui-tests",
+  "private": true,
+  "description": "Playwright UI regression tests. Run them through the e2e-test-suite-ui-playwright skill (scripts/run_ui.py).",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report reports/html"
+  },
+  "devDependencies": {
+    "@playwright/test": "PIN-AN-EXACT-RELEASE-AT-LEAST-2-WEEKS-OLD"
+  }
+}

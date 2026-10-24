@@ -1,0 +1,19 @@
+{
+  "app_name": "CHANGE ME",
+  "project_dir": "ui-tests",
+  "results_dir": "ui-results",
+  "default_browsers": ["chromium"],
+  "workers": 2,
+  "retries": 1,
+  "base_url": "http://127.0.0.1:{port}",
+  "start": {
+    "command": ["CHANGE", "ME", "--port", "{port}"],
+    "cwd": ".",
+    "health_path": "/",
+    "startup_timeout_s": 90,
+    "env": {}
+  },
+  "db": {"env_var": "DATABASE_URL", "seed": {"command": null}},
+  "db_guard": {"allowed_schemes": [], "protected_paths": [], "prod_env_vars": ["DATABASE_URL"], "prod_db_urls": [], "prod_base_urls": []},
+  "protected_paths": []
+}

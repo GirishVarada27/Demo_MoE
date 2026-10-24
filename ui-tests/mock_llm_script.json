@@ -1,0 +1,25 @@
+{
+  "_comment": "Deterministic model replies for UI tests. Default: look up the applicant, check documents, search the rules, evaluate eligibility, then answer. Scenarios override the answer for specific applicants.",
+  "ignore_user_prefixes": ["Your draft answer failed validation", "validate_draft rejected"],
+  "tool_steps": [
+    {"tool": "get_applicant_record", "args": {"applicant_id": "{{user:APP-\\d+}}"}},
+    {"tool": "check_documents", "args": {"applicant_id": "{{user:APP-\\d+}}", "curriculum": "{{tool:get_applicant_record:applicant.stated_curriculum}}"}},
+    {"tool": "search_requirements", "args": {"query": "equivalency requirements for {{tool:get_applicant_record:applicant.stated_curriculum}} certificates", "curriculum": "{{tool:get_applicant_record:applicant.stated_curriculum}}"}},
+    {"tool": "evaluate_eligibility", "args": {"case_state": {"applicant_id": "{{user:APP-\\d+}}", "curriculum": "{{tool:get_applicant_record:applicant.stated_curriculum}}"}}}
+  ],
+  "final_answer": "Verified: None.\nAssumed: Curriculum-specific thresholds for {{tool:get_applicant_record:applicant.stated_curriculum}} come from the knowledge base and may be provisional -- verify with MoE.\nSimulated: The file for {{tool:get_applicant_record:applicant.name}} in the mock case system was looked up and its documents were checked.\nNext step: Review the result and tell me how you'd like to proceed.",
+  "no_tools_reply": "PASS",
+  "scenarios": [
+    {
+      "name": "missing-emirates-id",
+      "match": "APP-003",
+      "final_answer": "Verified: None.\nAssumed: None.\nSimulated: The mock case file for {{tool:get_applicant_record:applicant.name}} has an attested grade 12 certificate, an attested transcript and a passport copy, but no Emirates ID copy.\nNext step: The missing Emirates ID copy blocks your application -- please upload a copy of your Emirates ID so it can proceed."
+    },
+    {
+      "name": "greeting",
+      "match": "^(?i:hi|hello|hey)\\b(?!.*APP-\\d+)",
+      "tool_steps": [],
+      "final_answer": "Verified: None.\nAssumed: None.\nSimulated: None.\nNext step: Tell me your applicant ID, or ask a question about certificate equivalency."
+    }
+  ]
+}
