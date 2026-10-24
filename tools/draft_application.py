@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from schemas import CreateDraftApplicationResult, DraftApplication
 from tools._data_dir import data_dir
+from tools._json_store import update_json_list
 from tools.applicant_lookup import get_applicant_record
 
 _STORE_PATH = data_dir() / "draft_applications.json"
@@ -54,9 +55,7 @@ def create_draft_application(applicant_id: str, simulate_failure: bool = False) 
     )
 
     try:
-        existing = json.loads(_STORE_PATH.read_text(encoding="utf-8")) if _STORE_PATH.exists() else []
-        existing.append(json.loads(draft.model_dump_json()))
-        _STORE_PATH.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+        update_json_list(_STORE_PATH, lambda drafts: drafts.append(json.loads(draft.model_dump_json())))
     except (OSError, json.JSONDecodeError) as exc:
         return CreateDraftApplicationResult(error=f"Failed to write draft application to the mock store: {exc}")
 

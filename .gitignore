@@ -24,6 +24,9 @@ perf-results/*
 # Security-test run folders
 security-results/
 
+# Lock files for the JSON mock stores (tools/_json_store.py)
+*.json.lock
+
 # Editors / OS
 .vscode/
 .idea/

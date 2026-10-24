@@ -149,7 +149,15 @@ binds each to the token's applicant. Someone else's or an unknown id gets
 `agent/orchestrator.py::_authorization_rejection`: a tool call naming any
 other applicant is rejected before it runs, and rejected calls never count
 as having run (ordering gate, validator). Sessions live in process memory,
-so run a single worker (`uvicorn api.server:app`). **Data dir:** every mock
+so run a single worker (`uvicorn api.server:app`). `api/limits.py` bounds
+them: 30-minute idle expiry, 5 per applicant (oldest evicted), 10,000 in
+total (LRU), and 50 turns each (then 409). It also rate limits chat per
+applicant (token bucket, 30/min, burst 15, then 429 with `Retry-After`).
+All of these are `MOE_*` env vars, listed in that module's docstring. The
+JSON mock stores are written only through
+`tools/_json_store.py::update_json_list`, which takes a thread lock and an
+OS file lock (`*.json.lock`) and replaces the file atomically. Never
+read-modify-write them directly. **Data dir:** every mock
 store resolves through `tools/_data_dir.py`. Setting `MOE_DATA_URL=file:///...`
 moves all of them, which load tests rely on so they never write `data/`.
 Load-test setup lives in `perf/` (see `perf/README.md`).

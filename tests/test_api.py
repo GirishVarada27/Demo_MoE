@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 import api.server as server
 from agent.orchestrator import run_turn
 from api.auth import token_hash
+from api.limits import RateLimiter, SessionStore
 from schemas import CaseState
 from tests._fakes import FakeMessage, FakeResponse, FakeToolCall, dispatching_create
 from tools._data_dir import DEFAULT_DATA_DIR, data_dir
@@ -37,7 +38,8 @@ def _fake_run_turn(case_state, conversation, message):
 def client(monkeypatch):
     monkeypatch.setenv("MOE_API_TOKENS", json.dumps({token_hash(t): a for t, a in TOKENS.items()}))
     monkeypatch.setattr(server, "run_turn", _fake_run_turn)
-    monkeypatch.setattr(server, "_sessions", {})
+    monkeypatch.setattr(server, "_sessions", SessionStore(idle_seconds=1800, per_owner=5, total=100))
+    monkeypatch.setattr(server, "_rate_limiter", RateLimiter(per_minute=6000, burst=1000))
     return TestClient(server.app)
 
 

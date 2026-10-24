@@ -15,8 +15,8 @@
     "health_path": "/health",
     "startup_timeout_s": 60,
     "env": {
-      "_comment": "Test-only users: token 'sec-APP-001' (user A) and 'sec-APP-002' (user B), valid only in the app process this run starts.",
-      "MOE_API_TOKENS": "{\"09256f143376f8e39cf3b88469bd61b94642a61e47b5efa51476d35cb6712626\": \"APP-001\", \"f9566606da17b31bd3e66d46536c59e68a4ab0406d9e9249709f5339a172886f\": \"APP-002\"}"
+      "_comment": "Test-only users: tokens 'sec-APP-001' (user A), 'sec-APP-002' (user B) and 'sec-APP-004' (user C, rate-limit probe only), valid only in the app process this run starts. Rate limits are left at their defaults so the probe tests the real setting.",
+      "MOE_API_TOKENS": "{\"09256f143376f8e39cf3b88469bd61b94642a61e47b5efa51476d35cb6712626\": \"APP-001\", \"f9566606da17b31bd3e66d46536c59e68a4ab0406d9e9249709f5339a172886f\": \"APP-002\", \"e811820a65034ebe7d0196701a1529cfa922617d0a2c9439213776f4333b28a6\": \"APP-004\"}"
     }
   },
   "db": {
@@ -62,6 +62,7 @@
     "rate_limit_probe": {
       "endpoint": "chat",
       "requests": 20,
+      "auth_headers": {"Authorization": "Bearer sec-APP-004"},
       "impact": "Each chat turn makes several paid model calls, so an unthrottled client can run up provider cost or exhaust the quota for everyone."
     }
   }

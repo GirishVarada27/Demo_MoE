@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from schemas import EscalateToHumanResult, EscalationTicket
 from tools._data_dir import data_dir
+from tools._json_store import update_json_list
 
 _QUEUE_PATH = data_dir() / "escalation_queue.json"
 
@@ -56,9 +57,7 @@ def escalate_to_human(reason: str, case_summary: str, simulate_failure: bool = F
     )
 
     try:
-        existing = json.loads(_QUEUE_PATH.read_text(encoding="utf-8")) if _QUEUE_PATH.exists() else []
-        existing.append(json.loads(ticket.model_dump_json()))
-        _QUEUE_PATH.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+        update_json_list(_QUEUE_PATH, lambda tickets: tickets.append(json.loads(ticket.model_dump_json())))
     except (OSError, json.JSONDecodeError) as exc:
         return EscalateToHumanResult(error=f"Failed to write escalation ticket to the mock queue: {exc}")
 
@@ -72,18 +71,17 @@ def append_to_ticket(ticket_id: str, note: str) -> EscalateToHumanResult:
     new context forward, not get silently discarded. Never raises -- same
     reasoning as escalate_to_human itself (this is also part of the
     safety-net path)."""
+    def add_note(tickets: list) -> dict | None:
+        for entry in tickets:
+            if entry.get("ticket_id") == ticket_id:
+                entry.setdefault("updates", []).append(note)
+                return entry
+        return None
+
     try:
-        existing = json.loads(_QUEUE_PATH.read_text(encoding="utf-8")) if _QUEUE_PATH.exists() else []
+        entry = update_json_list(_QUEUE_PATH, add_note)
     except (OSError, json.JSONDecodeError) as exc:
-        return EscalateToHumanResult(error=f"Failed to read the mock escalation queue: {exc}")
-
-    for entry in existing:
-        if entry.get("ticket_id") == ticket_id:
-            entry.setdefault("updates", []).append(note)
-            try:
-                _QUEUE_PATH.write_text(json.dumps(existing, indent=2), encoding="utf-8")
-            except OSError as exc:
-                return EscalateToHumanResult(error=f"Failed to write the mock escalation queue: {exc}")
-            return EscalateToHumanResult(ticket=EscalationTicket(**entry))
-
-    return EscalateToHumanResult(error=f"No existing ticket '{ticket_id}' found to append to.")
+        return EscalateToHumanResult(error=f"Failed to update the mock escalation queue: {exc}")
+    if entry is None:
+        return EscalateToHumanResult(error=f"No existing ticket '{ticket_id}' found to append to.")
+    return EscalateToHumanResult(ticket=EscalationTicket(**entry))
