@@ -1,0 +1,61 @@
+{
+  "app_name": "MOE certificate equivalency agent",
+  "languages": ["python"],
+  "source_paths": ["agent", "api", "tools", "ui", "config.py", "schemas.py", "check_azure.py"],
+  "config_paths": ["perf", ".env.example"],
+  "exclude_paths": [".venv", "tests", "data", "testing", "perf-results", "security-results"],
+  "python": {"venv_python": ".venv/Scripts/python.exe", "requirements": ["requirements.txt"]},
+  "fail_on": "high",
+  "accepted_risks": "security/accepted-risks.json",
+  "results_dir": "security-results",
+  "base_url": "http://127.0.0.1:{port}",
+  "start": {
+    "command": [".venv/Scripts/python.exe", "-m", "uvicorn", "api.server:app", "--host", "127.0.0.1", "--port", "{port}", "--no-access-log"],
+    "cwd": ".",
+    "health_path": "/health",
+    "startup_timeout_s": 60
+  },
+  "db": {
+    "env_var": "MOE_DATA_URL",
+    "seed": {
+      "copy": [{"from": "data/applicants.json", "to": "applicants.json"}],
+      "reset": {"escalation_queue.json": "[]", "draft_applications.json": "[]"}
+    }
+  },
+  "db_guard": {"allowed_schemes": ["file"], "protected_paths": ["data"], "prod_env_vars": ["MOE_DATA_URL"]},
+  "llm": {
+    "mock": {
+      "script": "perf/mock_llm_script.json",
+      "env": {
+        "AZURE_OPENAI_ENDPOINT": "http://127.0.0.1:{mock_port}",
+        "AZURE_OPENAI_API_KEY": "mock-key",
+        "AZURE_OPENAI_DEPLOYMENT": "mock-chat",
+        "EMBEDDING_DEPLOYMENT": "mock-embedding"
+      }
+    }
+  },
+  "dast": {
+    "auth_headers": {},
+    "allowed_public_paths": [],
+    "endpoints": [
+      {
+        "name": "chat",
+        "method": "POST",
+        "path": "/api/v1/chat",
+        "body": {"message": "{{input}}", "session_id": "{{session}}"},
+        "sample_input": "My applicant ID is APP-001. Can you check my certificate equivalency?",
+        "input_field": "message",
+        "max_input_chars": 4000,
+        "session_scoped": true,
+        "impact": "any caller can look up any applicant's record, documents and eligibility by applicant ID"
+      },
+      {"name": "health", "method": "GET", "path": "/health", "public": true},
+      {"name": "delete_session", "method": "DELETE", "path": "/api/v1/sessions/{{session}}"}
+    ],
+    "rate_limit_probe": {
+      "endpoint": "chat",
+      "requests": 20,
+      "impact": "Each chat turn makes several paid model calls, so an unthrottled client can run up provider cost or exhaust the quota for everyone."
+    }
+  }
+}

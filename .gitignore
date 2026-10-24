@@ -21,6 +21,9 @@ env/
 perf-results/*
 !perf-results/baseline.json
 
+# Security-test run folders
+security-results/
+
 # Editors / OS
 .vscode/
 .idea/
