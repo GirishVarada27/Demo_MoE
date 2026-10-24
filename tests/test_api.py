@@ -96,12 +96,57 @@ def test_chat_rejects_empty_message(client):
     assert client.post("/api/v1/chat", json={"message": ""}, headers=AUTH_1).status_code == 422
 
 
-def test_chat_returns_503_when_model_config_missing(client, monkeypatch):
+def test_503_hides_internal_error_details(client, monkeypatch, caplog):
     def broken(*args):
-        raise RuntimeError("Missing required environment variables")
+        raise RuntimeError("Missing required environment variables for Azure OpenAI: AZURE_OPENAI_API_KEY")
 
     monkeypatch.setattr(server, "run_turn", broken)
-    assert client.post("/api/v1/chat", json={"message": "hi"}, headers=AUTH_1).status_code == 503
+    with caplog.at_level("ERROR", logger="moe.api"):
+        response = client.post("/api/v1/chat", json={"message": "hi"}, headers=AUTH_1)
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert "AZURE" not in detail and "environment" not in detail
+    ref = detail.split("ref ")[1].rstrip(").")
+    assert any(ref in r.message and "AZURE_OPENAI_API_KEY" in r.message for r in caplog.records)  # details logged server-side
+
+
+# --- hardening: headers and docs -------------------------------------------------------
+
+
+@pytest.mark.parametrize("method, path, kwargs, status", [
+    ("get", "/health", {}, 200),
+    ("post", "/api/v1/chat", {"json": {"message": "hi"}, "headers": AUTH_1}, 200),
+    ("post", "/api/v1/chat", {"json": {"message": "hi"}}, 401),
+    ("post", "/api/v1/chat", {"json": {"message": "hi", "session_id": "nope"}, "headers": AUTH_1}, 404),
+    ("post", "/api/v1/chat", {"json": {"message": ""}, "headers": AUTH_1}, 422),
+])
+def test_security_headers_on_every_response(client, method, path, kwargs, status):
+    response = getattr(client, method)(path, **kwargs)
+    assert response.status_code == status
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert "default-src 'none'" in response.headers["content-security-policy"]
+
+
+def test_docs_disabled_by_default(client):
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        assert client.get(path).status_code == 404
+
+
+def test_docs_can_be_enabled_for_local_development(monkeypatch):
+    import importlib
+
+    monkeypatch.setenv("MOE_API_DOCS", "1")
+    try:
+        enabled = importlib.reload(server)
+        docs_client = TestClient(enabled.app)
+        assert docs_client.get("/openapi.json").status_code == 200
+        docs = docs_client.get("/docs")
+        assert docs.status_code == 200 and "content-security-policy" not in docs.headers  # Swagger UI needs its assets
+    finally:
+        monkeypatch.delenv("MOE_API_DOCS")
+        importlib.reload(server)
 
 
 # --- tool-call authorization in the orchestrator ------------------------------------------

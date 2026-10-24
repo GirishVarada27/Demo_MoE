@@ -14,12 +14,14 @@ running each turn.
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 import threading
 import time
+from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from agent.orchestrator import run_turn
@@ -27,7 +29,39 @@ from api.auth import authenticated_applicant
 from api.limits import RateLimiter, SessionStore
 from schemas import CaseState
 
-app = FastAPI(title="Certificate Equivalency Agent API", version="1")
+log = logging.getLogger("moe.api")
+
+# Interactive docs and the OpenAPI schema map every endpoint for an attacker,
+# so they're off unless MOE_API_DOCS=1 (local development).
+_DOCS = os.environ.get("MOE_API_DOCS", "").strip().lower() in ("1", "true", "yes")
+app = FastAPI(
+    title="Certificate Equivalency Agent API",
+    version="1",
+    docs_url="/docs" if _DOCS else None,
+    redoc_url="/redoc" if _DOCS else None,
+    openapi_url="/openapi.json" if _DOCS else None,
+)
+
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": "no-store",  # responses carry applicant case data
+    "Referrer-Policy": "no-referrer",
+    "X-Frame-Options": "DENY",
+}
+# JSON-only API: nothing should ever load or frame it. The docs pages (when
+# enabled) load Swagger/ReDoc assets, so they skip the CSP.
+_API_CSP = "default-src 'none'; frame-ancestors 'none'"
+_DOCS_PATHS = ("/docs", "/redoc", "/openapi.json")
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for name, value in _SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    if not request.url.path.startswith(_DOCS_PATHS):
+        response.headers.setdefault("Content-Security-Policy", _API_CSP)
+    return response
 
 
 class _Session:
@@ -101,7 +135,11 @@ def chat(request: ChatRequest, applicant: str = Depends(rate_limited_applicant))
         try:
             reply = run_turn(case_state, session.conversation, request.message)
         except RuntimeError as exc:  # e.g. missing model configuration
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
+            # The details (env var names, providers) stay in the server log; the
+            # caller gets a reference to quote, not the internals.
+            ref = uuid4().hex[:12]
+            log.error("chat turn failed (ref %s): %s", ref, exc)
+            raise HTTPException(status_code=503, detail=f"The service is temporarily unavailable (ref {ref}).") from exc
         duration_ms = (time.perf_counter() - started) * 1000
     return ChatResponse(
         session_id=session_id,

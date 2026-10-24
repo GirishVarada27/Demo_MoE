@@ -153,7 +153,13 @@ so run a single worker (`uvicorn api.server:app`). `api/limits.py` bounds
 them: 30-minute idle expiry, 5 per applicant (oldest evicted), 10,000 in
 total (LRU), and 50 turns each (then 409). It also rate limits chat per
 applicant (token bucket, 30/min, burst 15, then 429 with `Retry-After`).
-All of these are `MOE_*` env vars, listed in that module's docstring. The
+All of these are `MOE_*` env vars, listed in that module's docstring.
+Every response carries `nosniff`, `Cache-Control: no-store`,
+`Referrer-Policy`, `X-Frame-Options` and a strict CSP (from middleware).
+`/docs`, `/redoc` and `/openapi.json` are off unless `MOE_API_DOCS=1`.
+Error responses never echo exception text: log the detail and return a
+ref id. `requirements.txt` pins exact tested versions, so bump them
+deliberately. The
 JSON mock stores are written only through
 `tools/_json_store.py::update_json_list`, which takes a thread lock and an
 OS file lock (`*.json.lock`) and replaces the file atomically. Never
