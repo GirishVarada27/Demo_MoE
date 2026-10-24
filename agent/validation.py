@@ -214,12 +214,17 @@ def check_requirement_claims_grounded(draft: str, case_state: CaseState) -> list
     return [_format_claim_failure(f) for f in verified_claim_failures(draft, case_state)]
 
 
+def _succeeded(entry) -> bool:
+    """A trace entry for a tool call that actually ran and succeeded -- not a
+    failure, and not a call the orchestrator rejected before running it."""
+    return not entry.result_summary.startswith(("error:", "rejected"))
+
+
 def check_eligibility_statements_grounded(draft: str, case_state: CaseState) -> list[str]:
     if not _ELIGIBILITY_PATTERN.search(draft):
         return []
     has_successful_eligibility_check = any(
-        entry.tool == "evaluate_eligibility" and not entry.result_summary.startswith("error:")
-        for entry in case_state.tool_history
+        entry.tool == "evaluate_eligibility" and _succeeded(entry) for entry in case_state.tool_history
     )
     if not has_successful_eligibility_check:
         return ["Draft makes an eligibility/status statement without a successful evaluate_eligibility result this session."]
@@ -240,18 +245,11 @@ def check_draft_application_caveated(draft: str, case_state: CaseState) -> list[
     application and presenting it as settled when eligibility is still
     undetermined (or was never evaluated at all) is exactly the kind of
     overconfident claim CLAUDE.md rule 3 rules out."""
-    draft_created = any(
-        entry.tool == "create_draft_application" and not entry.result_summary.startswith("error:")
-        for entry in case_state.tool_history
-    )
+    draft_created = any(entry.tool == "create_draft_application" and _succeeded(entry) for entry in case_state.tool_history)
     if not draft_created:
         return []
 
-    eligibility_entries = [
-        entry
-        for entry in case_state.tool_history
-        if entry.tool == "evaluate_eligibility" and not entry.result_summary.startswith("error:")
-    ]
+    eligibility_entries = [entry for entry in case_state.tool_history if entry.tool == "evaluate_eligibility" and _succeeded(entry)]
     determinable = bool(eligibility_entries) and (
         "=PASS" in eligibility_entries[-1].result_summary or "=FAIL" in eligibility_entries[-1].result_summary
     )

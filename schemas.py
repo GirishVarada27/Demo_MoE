@@ -177,6 +177,11 @@ class CaseState(BaseModel):
     """
 
     applicant_id: str | None = None
+    # The only applicant this session may act on, set by an authenticated
+    # caller (api/server.py binds it from the bearer token). When set, any
+    # tool call naming a different applicant is rejected in code before it
+    # runs. None = unrestricted (the Streamlit operator console, tests).
+    authorized_applicant_id: str | None = None
     curriculum: str | None = None
     facts: dict[str, str] = {}
     user_reported_facts: dict[str, UserReportedFact] = {}

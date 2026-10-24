@@ -5,7 +5,11 @@
     "command": [".venv/Scripts/python.exe", "-m", "uvicorn", "api.server:app", "--host", "127.0.0.1", "--port", "{port}", "--no-access-log"],
     "cwd": ".",
     "health_path": "/health",
-    "startup_timeout_s": 60
+    "startup_timeout_s": 60,
+    "env": {
+      "_comment": "Test-only tokens 'perf-<APPLICANT_ID>', valid only in the app process this run starts.",
+      "MOE_API_TOKENS": "{\"9c78e3b05ce74e12320c722a09cfb6d2f22e3cfc422a579a0dd022cda1903bb9\": \"APP-001\", \"b14b23f9a21b296b04a18ded2b1b467bdcf195e443cc1f7fd734403fe0cc8c1b\": \"APP-002\", \"68273de5dcad8c8f21020ef7b8576b23ba8f0e2949a5b5ad5d4ee88f213dc198\": \"APP-004\", \"e56b750613278d3ed4fcd1e3e1d16abba27f96328a11f892704586cd6683aedc\": \"APP-005\", \"74b2248b24d552a83ced3566fde227d9d85d8053c74f5c116de74ab95404349b\": \"APP-007\", \"c969e5ebdb2bcbe7b691e7ca8c94cd75aaf43e0a4373bd4ba4959c6b08427d77\": \"APP-008\", \"862d570d39ee1b58c24d4d97893e72e971c2e5ffd52b312e079e44a4ca9e21cc\": \"APP-009\", \"06580bcf4caa1634d8efe1382aaa655b9dfb7e624b062fa59cc28e79ede48d8d\": \"APP-010\"}"
+    }
   },
   "db": {
     "env_var": "MOE_DATA_URL",
@@ -49,9 +53,9 @@
           "name": "POST /api/v1/chat",
           "method": "POST",
           "path": "/api/v1/chat",
+          "headers": {"Authorization": "Bearer perf-{{pool:applicants}}"},
           "body": {
-            "message": "My applicant ID is {{pool:applicants}}. Can you check my certificate equivalency?",
-            "session_id": "{{session}}"
+            "message": "My applicant ID is {{pool:applicants}}. Can you check my certificate equivalency?"
           },
           "expect_status": [200],
           "json_not_empty": ["reply"],

@@ -138,9 +138,18 @@ from multiple places in `run_turn` — it must never be the thing that
 crashes a turn.
 
 **HTTP API (`api/server.py`):** FastAPI over `run_turn`:
-`POST /api/v1/chat {message, session_id?}`, `GET /health` and
-`DELETE /api/v1/sessions/{id}`. Sessions are held in process memory, so
-run a single worker (`uvicorn api.server:app`). **Data dir:** every mock
+`POST /api/v1/chat {message, session_id?}`, `GET /health` (the only
+public route) and `DELETE /api/v1/sessions/{id}`. Every other route needs
+`Authorization: Bearer <token>`. `api/auth.py` maps
+`sha256(token) → applicant_id` from the `MOE_API_TOKENS` env var and fails
+closed when it's unset (`python -m api.auth new-token APP-001` issues one).
+The server issues session ids itself (omit `session_id` to start one) and
+binds each to the token's applicant. Someone else's or an unknown id gets
+404. Each session's `CaseState.authorized_applicant_id` is enforced in
+`agent/orchestrator.py::_authorization_rejection`: a tool call naming any
+other applicant is rejected before it runs, and rejected calls never count
+as having run (ordering gate, validator). Sessions live in process memory,
+so run a single worker (`uvicorn api.server:app`). **Data dir:** every mock
 store resolves through `tools/_data_dir.py`. Setting `MOE_DATA_URL=file:///...`
 moves all of them, which load tests rely on so they never write `data/`.
 Load-test setup lives in `perf/` (see `perf/README.md`).
@@ -160,9 +169,9 @@ helpers (`dispatching_create` routes the LLM-verifier's call to a separate
 fixed response so tests don't have to predict how many extra calls
 validation makes). Tools with real side effects
 (`tools/escalation.py::_QUEUE_PATH`, `tools/draft_application.py::
-_STORE_PATH`) must be monkeypatched to a `tmp_path` in any test that
-exercises them for real, or they'll write into the actual `data/*.json`
-mock stores.
+_STORE_PATH`) are redirected to each test's `tmp_path` automatically by an
+autouse fixture in `conftest.py`, so no test can write into the real
+`data/*.json` mock stores.
 
 ## Project rules
 

@@ -13,7 +13,11 @@
     "command": [".venv/Scripts/python.exe", "-m", "uvicorn", "api.server:app", "--host", "127.0.0.1", "--port", "{port}", "--no-access-log"],
     "cwd": ".",
     "health_path": "/health",
-    "startup_timeout_s": 60
+    "startup_timeout_s": 60,
+    "env": {
+      "_comment": "Test-only users: token 'sec-APP-001' (user A) and 'sec-APP-002' (user B), valid only in the app process this run starts.",
+      "MOE_API_TOKENS": "{\"09256f143376f8e39cf3b88469bd61b94642a61e47b5efa51476d35cb6712626\": \"APP-001\", \"f9566606da17b31bd3e66d46536c59e68a4ab0406d9e9249709f5339a172886f\": \"APP-002\"}"
+    }
   },
   "db": {
     "env_var": "MOE_DATA_URL",
@@ -35,18 +39,21 @@
     }
   },
   "dast": {
-    "auth_headers": {},
+    "auth_headers": {"Authorization": "Bearer sec-APP-001"},
+    "alt_auth_headers": {"Authorization": "Bearer sec-APP-002"},
     "allowed_public_paths": [],
     "endpoints": [
       {
         "name": "chat",
         "method": "POST",
         "path": "/api/v1/chat",
-        "body": {"message": "{{input}}", "session_id": "{{session}}"},
+        "body": {"message": "{{input}}"},
         "sample_input": "My applicant ID is APP-001. Can you check my certificate equivalency?",
         "input_field": "message",
         "max_input_chars": 4000,
         "session_scoped": true,
+        "session_field": "session_id",
+        "session_response_field": "session_id",
         "impact": "any caller can look up any applicant's record, documents and eligibility by applicant ID"
       },
       {"name": "health", "method": "GET", "path": "/health", "public": true},

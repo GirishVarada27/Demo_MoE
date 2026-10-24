@@ -112,6 +112,33 @@ def _first_person_fact_sentences(user_message: str) -> list[str]:
     return found
 
 
+def _requested_applicant_id(name: str, raw_args: dict) -> str | None:
+    """The applicant a tool call would act on, if the tool takes one."""
+    if name == "evaluate_eligibility":
+        inner = raw_args.get("case_state")
+        return inner.get("applicant_id") if isinstance(inner, dict) else None
+    if name in ("get_applicant_record", "check_documents", "create_draft_application"):
+        return raw_args.get("applicant_id")
+    return None
+
+
+def _authorization_rejection(case_state: CaseState, name: str, raw_args: dict) -> str | None:
+    """Why this tool call must not run, or None if it may. The model picks
+    tools and arguments from user-influenced text, so whose data a call
+    touches is decided here in code, never left to the prompt."""
+    allowed = case_state.authorized_applicant_id
+    if allowed is None:
+        return None
+    requested = _requested_applicant_id(name, raw_args)
+    if requested is None or str(requested).strip().upper() == allowed.upper():
+        return None
+    return (
+        f"{name} rejected: this session is only authorized for applicant {allowed}, not {requested}. "
+        "Do not look up, check, evaluate or file anything for another applicant; tell the user you can "
+        "only help with their own application."
+    )
+
+
 def _record_user_fact_rejection(case_state: CaseState, user_message: str, raw_args: dict) -> str | None:
     """Why record_user_fact must not run for this call, or None if it may.
     Enforced in code, not just the prompt: the model was recording on-file
@@ -142,7 +169,9 @@ def _tools_required_before_validation(case_state: CaseState, turn_start_index: i
     a generic policy question a case turn. Doesn't apply once the case was
     handed to a human this turn (e.g. a tool failed twice), and a lookup
     that found no applicant needs no evaluation."""
-    turn = case_state.tool_history[turn_start_index:]
+    # Rejected calls (authorization, record_user_fact gate) never ran, so they neither
+    # make this a case turn nor satisfy the requirement.
+    turn = [t for t in case_state.tool_history[turn_start_index:] if not t.result_summary.startswith("rejected")]
     tools = {t.tool for t in turn}
     if not tools & (_CASE_LOOKUP_TOOLS | {"evaluate_eligibility"}):
         return []
@@ -865,6 +894,14 @@ def run_turn(
                 # Every tool_call id still needs a reply, or the saved conversation is invalid next turn.
                 limit_hit = True
                 _reply_to_tool_call(tc, json.dumps({"error": f"Not executed: per-turn limit of {MAX_TOOL_CALLS} tool calls reached."}))
+                continue
+
+            denied = _authorization_rejection(case_state, name, raw_args)
+            if denied is not None:
+                _log_tool_call(case_state, name, raw_args, f"rejected (authorization): {denied}")
+                result_json = json.dumps({"error": denied})
+                seen_calls[call_key] = result_json
+                _reply_to_tool_call(tc, result_json)
                 continue
 
             if name == "record_user_fact":
